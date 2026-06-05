@@ -1,0 +1,35 @@
+
+> zhi-learning-backend@0.1.0 dev
+> next dev -p 3010
+
+  ▲ Next.js 14.2.35
+  - Local:        http://localhost:3010
+
+ ✓ Starting...
+ ✓ Ready in 2.7s
+ ○ Compiling /src/middleware ...
+ ✓ Compiled /src/middleware in 660ms (72 modules)
+ ○ Compiling /api/auth/me ...
+ ✓ Compiled /api/auth/me in 1019ms (101 modules)
+ ○ Compiling /_error ...
+ ✓ Compiled /_error in 4.9s (532 modules)
+ GET /api/auth/me 500 in 6578ms
+ ✓ Compiled in 117ms (48 modules)
+ ✓ Compiled /api/auth/me in 131ms (141 modules)
+ GET /api/auth/me 401 in 272ms
+   Reload env: .env.local
+ ✓ Compiled in 2.3s (509 modules)
+   Reload env: .env.local
+ ✓ Compiled in 182ms (509 modules)
+ ○ Compiling /api/auth/register ...
+ ✓ Compiled /api/auth/register in 705ms (141 modules)
+ OPTIONS /api/auth/register 204 in 853ms
+ ✓ Compiled in 56ms (72 modules)
+ POST /api/auth/register 403 in 17ms
+ ○ Compiling /_not-found ...
+ ✓ Compiled /_not-found in 1131ms (734 modules)
+ POST /api/auth/register 404 in 1330ms
+ POST /api/auth/register 500 in 1534ms
+ ✓ Compiled in 120ms (141 modules)
+ ✓ Compiled in 75ms (48 modules)
+[?25h
