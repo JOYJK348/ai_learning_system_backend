@@ -12,36 +12,35 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const { payment_id } = body;
 
-    if (!payment_id) {
-      return json({ error: "Payment ID required" }, 400);
-    }
+    if (!payment_id) return json({ error: "Payment ID required" }, 400);
 
     const supabase = getSupabaseAdmin();
 
+    // payment_status_id=2 → 'success' in lookup_payment_status
     const { data, error } = await supabase
-      .from('payments')
+      .from("payments")
       .update({
-        status: 'verified',
-        verified_by: user!.id,
-        verified_at: new Date().toISOString(),
+        payment_status_id: 2,
+        verified_by: user!.profileId,
+        updated_at: new Date().toISOString(),
       })
-      .eq('id', payment_id)
+      .eq("id", payment_id)
+      .is("deleted_at", null)
       .select()
       .single();
 
-    if (error) {
-      return json({ error: error.message }, 500);
-    }
+    if (error) return json({ error: error.message }, 500);
 
-    // Update parent status if payment verified
-    if (data && data.parent_id) {
+    // Activate parent plan if verified
+    if (data?.parent_id) {
       await supabase
-        .from('parents')
+        .from("parents")
         .update({
-          status: 'active',
-          plan_status: 'paid',
+          status_id: 1,        // active
+          plan_status_id: 1,   // active
+          updated_at: new Date().toISOString(),
         })
-        .eq('id', data.parent_id);
+        .eq("id", data.parent_id);
     }
 
     return json({ data, message: "Payment verified" });
