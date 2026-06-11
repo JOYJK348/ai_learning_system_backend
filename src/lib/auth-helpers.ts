@@ -70,7 +70,7 @@ export function setAuthCookies(res: NextResponse, accessToken: string, refreshTo
   res.cookies.set(ACCESS_COOKIE, accessToken, {
     httpOnly: true,
     secure,
-    sameSite: "strict",
+    sameSite: secure ? "none" : "lax",
     path: "/",
     maxAge: 60 * 60
   });
@@ -79,7 +79,7 @@ export function setAuthCookies(res: NextResponse, accessToken: string, refreshTo
     res.cookies.set(REFRESH_COOKIE, refreshToken, {
       httpOnly: true,
       secure,
-      sameSite: "strict",
+      sameSite: secure ? "none" : "lax",
       path: "/api/auth",
       maxAge: 60 * 60 * 24 * 30
     });
@@ -87,8 +87,8 @@ export function setAuthCookies(res: NextResponse, accessToken: string, refreshTo
 }
 
 export function clearAuthCookies(res: NextResponse) {
-  res.cookies.set(ACCESS_COOKIE, "", { httpOnly: true, sameSite: "strict", path: "/", maxAge: 0 });
-  res.cookies.set(REFRESH_COOKIE, "", { httpOnly: true, sameSite: "strict", path: "/api/auth", maxAge: 0 });
+  res.cookies.set(ACCESS_COOKIE, "", { httpOnly: true, sameSite: process.env.NODE_ENV === "production" ? "none" : "lax", path: "/", maxAge: 0 });
+  res.cookies.set(REFRESH_COOKIE, "", { httpOnly: true, sameSite: process.env.NODE_ENV === "production" ? "none" : "lax", path: "/api/auth", maxAge: 0 });
 }
 
 export async function logAuthAttempt(input: {
