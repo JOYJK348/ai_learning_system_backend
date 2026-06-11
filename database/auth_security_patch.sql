@@ -40,8 +40,6 @@ CREATE INDEX IF NOT EXISTS idx_token_blacklist_expires
 
 ALTER TABLE auth_attempt_logs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE token_blacklist   ENABLE ROW LEVEL SECURITY;
-ALTER TABLE auth_attempt_logs FORCE ROW LEVEL SECURITY;
-ALTER TABLE token_blacklist   FORCE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS admin_full_access_auth_attempt_logs ON auth_attempt_logs;
 CREATE POLICY admin_full_access_auth_attempt_logs ON auth_attempt_logs

@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { getCurrentUser, json, requireRole } from "./auth-helpers";
+import { getCurrentUser, json, requireRole, requireSchoolAdmin } from "./auth-helpers";
 import { getSupabaseAdmin } from "./supabase-server";
 
 type SchoolPayload = Record<string, unknown>;
@@ -34,12 +34,6 @@ function cleanPayload(body: Record<string, unknown>, allowed: string[]) {
 async function requireSuperAdmin(req: NextRequest) {
   const user = await getCurrentUser(req);
   if (!requireRole(user, ["super_admin"])) return null;
-  return user;
-}
-
-async function requireSchoolAdmin(req: NextRequest) {
-  const user = await getCurrentUser(req);
-  if (!user || user.role !== "school_admin" || !user.schoolId) return null;
   return user;
 }
 
@@ -265,12 +259,13 @@ export async function createAdminSchoolAdmin(req: NextRequest) {
 }
 
 export async function getSchoolAdminMe(req: NextRequest) {
-  const user = await requireSchoolAdmin(req);
+  const { user, planExpired } = await requireSchoolAdmin(req);
+  if (planExpired) return json({ error: "plan_expired", message: "Your 14-day trial has ended. Please contact support to renew your plan." }, 403);
   if (!user) return json({ error: "Forbidden" }, 403);
 
   const { data, error } = await getSupabaseAdmin()
     .from("schools")
-    .select("id,name,code,city,state,email,phone,plan_status_id,max_students,status_id")
+    .select("id,name,code,city,state,email,phone,plan_status_id,max_students,status_id,logo_url")
     .eq("id", user.schoolId)
     .is("deleted_at", null)
     .maybeSingle();
@@ -281,7 +276,8 @@ export async function getSchoolAdminMe(req: NextRequest) {
 }
 
 export async function getSchoolAdminDashboard(req: NextRequest) {
-  const user = await requireSchoolAdmin(req);
+  const { user, planExpired } = await requireSchoolAdmin(req);
+  if (planExpired) return json({ error: "plan_expired", message: "Your 14-day trial has ended. Please contact support to renew your plan." }, 403);
   if (!user) return json({ error: "Forbidden" }, 403);
 
   const supabaseAdmin = getSupabaseAdmin();
@@ -383,95 +379,142 @@ export async function getSchoolAdminDashboard(req: NextRequest) {
 }
 
 export async function listSchoolStudents(req: NextRequest) {
-  const user = await requireSchoolAdmin(req);
+  const { user, planExpired } = await requireSchoolAdmin(req);
+  if (planExpired) return json({ error: "plan_expired", message: "Your 14-day trial has ended. Please contact support to renew your plan." }, 403);
   if (!user) return json({ error: "Forbidden" }, 403);
 
-  const { data, error } = await getSupabaseAdmin()
+  const url = new URL(req.url);
+  const gradeFilter = url.searchParams.get("grade_id");
+
+  let query = getSupabaseAdmin()
     .from("school_students")
     .select(
-      "id,student_id,roll_number,section,admission_date,status_id,created_at,updated_at"
+      `id,student_id,roll_number,section,admission_date,status_id,created_at,updated_at,
+       students!inner(full_name,grade_id,total_stars_earned,overall_progress,last_activity_at,grades!inner(name))`
     )
     .eq("school_id", user.schoolId)
     .is("deleted_at", null)
     .order("created_at", { ascending: false });
 
+  if (gradeFilter) {
+    query = query.eq("students.grade_id", gradeFilter);
+  }
+
+  const { data, error } = await query;
+
   if (error) return json({ error: error.message }, 500);
-  return json({ data });
+
+  // Flatten nested students object for easier frontend consumption
+  const flatData = (data || []).map((row: Record<string, unknown>) => ({
+    id: row.id,
+    student_id: row.student_id,
+    roll_number: row.roll_number,
+    section: row.section,
+    admission_date: row.admission_date,
+    status_id: row.status_id,
+    created_at: row.created_at,
+    updated_at: row.updated_at,
+    full_name: (row.students as Record<string, unknown>)?.full_name ?? null,
+    grade_id: (row.students as Record<string, unknown>)?.grade_id ?? null,
+    grade_name: ((row.students as Record<string, unknown>)?.grades as Record<string, unknown>)?.name ?? null,
+    total_stars_earned: (row.students as Record<string, unknown>)?.total_stars_earned ?? 0,
+    overall_progress: (row.students as Record<string, unknown>)?.overall_progress ?? 0,
+    last_activity_at: (row.students as Record<string, unknown>)?.last_activity_at ?? null,
+  }));
+
+  return json({ data: flatData });
 }
 
 export async function createSchoolStudent(req: NextRequest) {
-  const user = await requireSchoolAdmin(req);
+  const { user, planExpired } = await requireSchoolAdmin(req);
+  if (planExpired) return json({ error: "plan_expired", message: "Your 14-day trial has ended. Please contact support to renew your plan." }, 403);
   if (!user) return json({ error: "Forbidden" }, 403);
 
   const body = await req.json().catch(() => ({}));
-  const existingStudentId = String(body.student_id || "").trim();
-  const studentPayload = cleanPayload(body as SchoolStudentPayload, [
-    "full_name",
-    "date_of_birth",
-    "grade_id",
-    "profile_photo_url",
-    "status_id"
-  ]);
-  const schoolStudentPayload = cleanPayload(body as SchoolStudentPayload, [
-    "roll_number",
-    "section",
-    "admission_date",
-    "status_id"
-  ]);
+  const fullName = String(body.full_name || "").trim();
+  const email = String(body.email || "").trim();
+  const mobile = String(body.mobile || "").trim();
 
-  if (!existingStudentId && !studentPayload.full_name) {
-    return json({ error: "student_id or full_name is required" }, 400);
-  }
+  if (!fullName) return json({ error: "full_name is required" }, 400);
+  if (!email) return json({ error: "email is required" }, 400);
+  if (!mobile || mobile.length < 6) return json({ error: "valid mobile is required" }, 400);
 
-  if (!studentPayload.status_id) studentPayload.status_id = await getActiveStatusId();
-  if (!schoolStudentPayload.status_id) schoolStudentPayload.status_id = await getActiveStatusId();
+  const password = mobile.slice(-6);
+  const gradeId = String(body.grade_id || "").trim();
+  const section = String(body.section || "").trim();
+  const rollNumber = String(body.roll_number || "").trim();
 
   const supabaseAdmin = getSupabaseAdmin();
-  let studentId = existingStudentId;
 
-  if (existingStudentId) {
-    const { data: existingStudent, error: existingError } = await supabaseAdmin
-      .from("students")
-      .select("id")
-      .eq("id", existingStudentId)
-      .is("deleted_at", null)
-      .maybeSingle();
+  // 1. Create Supabase Auth user
+  const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
+    email,
+    password,
+    email_confirm: true,
+    user_metadata: { role: "student", name: fullName }
+  });
 
-    if (existingError) return json({ error: existingError.message }, 400);
-    if (!existingStudent) return json({ error: "Student not found" }, 404);
-  } else {
-    const { data: student, error: studentError } = await supabaseAdmin
-      .from("students")
-      .insert(studentPayload)
-      .select("id")
-      .single();
+  if (authError) return json({ error: authError.message }, 400);
 
-    if (studentError) return json({ error: studentError.message }, 400);
-    studentId = student.id;
+  // 2. Insert into students table
+  const activeStatusId = await getActiveStatusId();
+  const { data: student, error: studentError } = await supabaseAdmin
+    .from("students")
+    .insert({
+      auth_user_id: authData.user.id,
+      full_name: fullName,
+      email,
+      mobile,
+      grade_id: gradeId || null,
+      status_id: activeStatusId
+    })
+    .select("id,full_name,email,mobile,overall_progress,total_stars_earned,last_activity_at,created_at")
+    .single();
+
+  if (studentError) {
+    // Rollback auth user
+    await supabaseAdmin.auth.admin.deleteUser(authData.user.id);
+    return json({ error: studentError.message }, 400);
   }
 
-  const { data, error } = await supabaseAdmin
+  // 3. Link to school via school_students
+  const { data: schoolLink, error: linkError } = await supabaseAdmin
     .from("school_students")
     .insert({
       school_id: user.schoolId,
-      student_id: studentId,
-      roll_number: schoolStudentPayload.roll_number || null,
-      section: schoolStudentPayload.section || null,
-      admission_date: schoolStudentPayload.admission_date || null,
-      status_id: schoolStudentPayload.status_id,
+      student_id: student.id,
+      roll_number: rollNumber || null,
+      section: section || null,
+      status_id: activeStatusId,
       created_by: user.profileId
     })
-    .select(
-      "id,school_id,student_id,roll_number,section,admission_date,status_id,created_at,updated_at"
-    )
+    .select("id,roll_number,section")
     .single();
 
-  if (error) return json({ error: error.message }, 400);
-  return json({ data }, 201);
+  if (linkError) {
+    // Rollback: delete student + auth user
+    await supabaseAdmin.from("students").delete().eq("id", student.id);
+    await supabaseAdmin.auth.admin.deleteUser(authData.user.id);
+    return json({ error: linkError.message }, 400);
+  }
+
+  return json({
+    data: {
+      id: student.id,
+      full_name: student.full_name,
+      email: student.email,
+      grade_id: gradeId,
+      section,
+      roll_number: rollNumber,
+      username: email,
+      password
+    }
+  }, 201);
 }
 
 export async function getSchoolStudentById(id: string, req: NextRequest) {
-  const user = await requireSchoolAdmin(req);
+  const { user, planExpired } = await requireSchoolAdmin(req);
+  if (planExpired) return json({ error: "plan_expired", message: "Your 14-day trial has ended. Please contact support to renew your plan." }, 403);
   if (!user) return json({ error: "Forbidden" }, 403);
 
   const { data, error } = await getSupabaseAdmin()
@@ -490,7 +533,8 @@ export async function getSchoolStudentById(id: string, req: NextRequest) {
 }
 
 export async function updateSchoolStudent(id: string, req: NextRequest) {
-  const user = await requireSchoolAdmin(req);
+  const { user, planExpired } = await requireSchoolAdmin(req);
+  if (planExpired) return json({ error: "plan_expired", message: "Your 14-day trial has ended. Please contact support to renew your plan." }, 403);
   if (!user) return json({ error: "Forbidden" }, 403);
 
   const body = await req.json().catch(() => ({}));
@@ -542,7 +586,8 @@ export async function updateSchoolStudent(id: string, req: NextRequest) {
 }
 
 export async function deleteSchoolStudent(id: string, req: NextRequest) {
-  const user = await requireSchoolAdmin(req);
+  const { user, planExpired } = await requireSchoolAdmin(req);
+  if (planExpired) return json({ error: "plan_expired", message: "Your 14-day trial has ended. Please contact support to renew your plan." }, 403);
   if (!user) return json({ error: "Forbidden" }, 403);
 
   const { data, error } = await getSupabaseAdmin()

@@ -1,0 +1,12 @@
+  ▲ Next.js 14.2.35
+  - Local:        http://localhost:3010
+  - Environments: .env.local
+
+ ✓ Starting...
+ ✓ Ready in 2.4s
+ ✓ Compiled /src/middleware in 177ms (72 modules)
+ ✓ Compiled /api/auth/me in 291ms (101 modules)
+ GET /api/auth/me 401 in 448ms
+ ✓ Compiled /api/auth/login in 119ms (103 modules)
+ POST /api/auth/login 401 in 2013ms
+[?25h

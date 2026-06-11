@@ -115,7 +115,7 @@ export async function POST(req: NextRequest) {
     // Calculate expiry date
     const startedAt = new Date();
     const expiresAt = new Date();
-    expiresAt.setDate(expiresAt.getDate() + (Number(body.trial_days) || 30));
+    expiresAt.setDate(expiresAt.getDate() + (Number(body.trial_days) || 14));
 
     // Generate unique school code
     const code = body.name.replace(/[^a-zA-Z0-9]/g, '').substring(0, 10).toUpperCase()

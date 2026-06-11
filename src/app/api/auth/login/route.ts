@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { getSupabase } from "@/lib/supabase";
 import {
+  checkSchoolPlanExpired,
   getClientIp,
   getProfileForAuthUser,
   getUserAgent,
@@ -41,6 +42,14 @@ export async function POST(req: NextRequest) {
   if (!profile) {
     await logAuthAttempt({ email, success: false, reason: "profile_not_found", ip, userAgent, userId: data.user.id });
     return json({ error: "User profile not found" }, 403);
+  }
+
+  if (profile.role === "school_admin" && profile.schoolId) {
+    const { expired } = await checkSchoolPlanExpired(profile.schoolId);
+    if (expired) {
+      await logAuthAttempt({ email, success: false, reason: "plan_expired", ip, userAgent, userId: data.user.id });
+      return json({ error: "plan_expired", message: "Your 14-day trial has ended. Please contact support to renew your plan." }, 403);
+    }
   }
 
   const res = json({ user: profile });

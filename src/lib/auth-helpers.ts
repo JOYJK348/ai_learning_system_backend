@@ -206,7 +206,7 @@ export async function getProfileForAuthUser(authUserId: string): Promise<AuthUse
 
   const student = await supabaseAdmin
     .from("students")
-    .select("id,full_name")
+    .select("id,full_name,email")
     .eq("auth_user_id", authUserId)
     .is("deleted_at", null)
     .maybeSingle();
@@ -214,7 +214,7 @@ export async function getProfileForAuthUser(authUserId: string): Promise<AuthUse
   if (student.data) {
     return {
       id: authUserId,
-      email: null,
+      email: student.data.email || null,
       role: "student",
       profileId: student.data.id,
       name: student.data.full_name
@@ -237,4 +237,24 @@ export async function getCurrentUser(req: NextRequest) {
 
 export function requireRole(user: AuthUser | null, roles: UserRole[]) {
   return Boolean(user && roles.includes(user.role));
+}
+
+export async function checkSchoolPlanExpired(schoolId: string): Promise<{ expired: boolean; expiresAt: string | null }> {
+  const supabaseAdmin = getSupabaseAdmin();
+  const { data: school } = await supabaseAdmin
+    .from("schools")
+    .select("plan_expires_at")
+    .eq("id", schoolId)
+    .maybeSingle();
+  if (!school?.plan_expires_at) return { expired: false, expiresAt: null };
+  const expired = new Date(school.plan_expires_at) < new Date();
+  return { expired, expiresAt: school.plan_expires_at };
+}
+
+export async function requireSchoolAdmin(req: NextRequest) {
+  const currentUser = await getCurrentUser(req);
+  if (!requireRole(currentUser, ["school_admin"]) || !currentUser?.schoolId) return { user: null };
+  const { expired } = await checkSchoolPlanExpired(currentUser.schoolId);
+  if (expired) return { user: currentUser, planExpired: true };
+  return { user: currentUser };
 }
