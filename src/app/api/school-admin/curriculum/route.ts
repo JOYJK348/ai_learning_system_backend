@@ -35,21 +35,24 @@ export async function GET(req: NextRequest) {
 
       const { data: allSubjects } = await supabase
         .from("subjects")
-        .select("id,grade_id")
+        .select("id,name,grade_id,sort_order")
         .in("grade_id", gradeIds)
-        .is("deleted_at", null);
+        .is("deleted_at", null)
+        .order("sort_order");
 
       const { data: allChapters } = await supabase
         .from("chapters")
-        .select("id,subject_id")
+        .select("id,name,subject_id,sort_order")
         .in("subject_id", allSubjects?.map((s) => s.id) || [])
-        .is("deleted_at", null);
+        .is("deleted_at", null)
+        .order("sort_order");
 
       const { data: allLessons } = await supabase
         .from("lessons")
-        .select("id,chapter_id")
+        .select("id,title,chapter_id,sort_order")
         .in("chapter_id", allChapters?.map((c) => c.id) || [])
-        .is("deleted_at", null);
+        .is("deleted_at", null)
+        .order("sort_order");
 
       const { data: allQuizzes } = await supabase
         .from("quizzes")
