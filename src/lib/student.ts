@@ -1,4 +1,4 @@
-﻿import { NextRequest } from "next/server";
+import { NextRequest } from "next/server";
 import { getCurrentUser, json, requireRole } from "./auth-helpers";
 import { getSupabaseAdmin } from "./supabase-server";
 
@@ -308,7 +308,7 @@ export async function listStudentLessons(req: NextRequest) {
     const subjectIds = subjects.map((s) => s.id);
     const { data: chapters } = await supabaseAdmin
       .from("chapters")
-      .select("id,subject_id,name")
+      .select("id,subject_id,name,sort_order")
       .in("subject_id", subjectIds)
       .is("deleted_at", null)
       .order("sort_order", { ascending: true });
@@ -336,12 +336,48 @@ export async function listStudentLessons(req: NextRequest) {
     const progressMap: Record<string, JsonRecord> = {};
     (progressRows || []).forEach((p) => { progressMap[p.lesson_id] = p; });
 
-    const chapterSubjectMap: Record<string, string> = {};
-    (chapters || []).forEach((c) => { chapterSubjectMap[c.id] = c.subject_id; });
+    // ── Sequential chapter lock/unlock ──
+    const chaptersBySubject: Record<string, NonNullable<typeof chapters>> = {};
+    (chapters || []).forEach((c) => {
+      if (!chaptersBySubject[c.subject_id]) chaptersBySubject[c.subject_id] = [];
+      chaptersBySubject[c.subject_id]!.push(c);
+    });
+
+    const lessonCountPerChapter: Record<string, number> = {};
+    const completedLessonCountPerChapter: Record<string, number> = {};
+    lessons.forEach((l) => {
+      lessonCountPerChapter[l.chapter_id] = (lessonCountPerChapter[l.chapter_id] || 0) + 1;
+      const p = progressMap[l.id];
+      if (p && p.status === "completed") {
+        completedLessonCountPerChapter[l.chapter_id] = (completedLessonCountPerChapter[l.chapter_id] || 0) + 1;
+      }
+    });
+
+    const unlockedChapters = new Set<string>();
+    (chapters || []).forEach((c) => {
+      const subjectChapters = chaptersBySubject[c.subject_id] || [];
+      const idx = subjectChapters.findIndex((sc) => sc.id === c.id);
+      if (idx === 0) {
+        unlockedChapters.add(c.id);
+      } else if (idx > 0) {
+        const prevChapter = subjectChapters[idx - 1];
+        if (prevChapter) {
+          const total = lessonCountPerChapter[prevChapter.id] || 0;
+          const completed = completedLessonCountPerChapter[prevChapter.id] || 0;
+          if (total > 0 && completed >= total) unlockedChapters.add(c.id);
+        }
+      }
+    });
 
     const grouped: JsonRecord[] = subjects.map((subject) => {
       const subjectChapters = (chapters || []).filter((c) => c.subject_id === subject.id);
       const chapterData = subjectChapters.map((chapter) => {
+        const totalLessonsInChapter = lessonCountPerChapter[chapter.id] || 0;
+        const completedLessonsInChapter = completedLessonCountPerChapter[chapter.id] || 0;
+        const chapterCompletion = totalLessonsInChapter > 0
+          ? Math.round((completedLessonsInChapter / totalLessonsInChapter) * 100)
+          : 0;
+
         const chapterLessons = (lessons || [])
           .filter((l) => l.chapter_id === chapter.id)
           .map((l) => ({
@@ -352,9 +388,19 @@ export async function listStudentLessons(req: NextRequest) {
             thumbnail_url: l.thumbnail_url,
             duration_seconds: l.duration_seconds,
             sort_order: l.sort_order,
+            is_unlocked: unlockedChapters.has(chapter.id),
             progress: progressMap[l.id] || { status: "not_started", completion_percentage: 0 },
           }));
-        return { id: chapter.id, name: chapter.name, lessons: chapterLessons };
+        return {
+          id: chapter.id,
+          name: chapter.name,
+          sort_order: chapter.sort_order,
+          is_unlocked: unlockedChapters.has(chapter.id),
+          completion_percentage: chapterCompletion,
+          total_lessons: totalLessonsInChapter,
+          completed_lessons: completedLessonsInChapter,
+          lessons: chapterLessons,
+        };
       });
       return { id: subject.id, name: subject.name, chapters: chapterData };
     });
@@ -566,6 +612,9 @@ export async function updateLessonProgress(req: NextRequest, lessonId: string) {
             })
             .eq("id", studentId);
         }
+
+        // Auto-unlock next chapter if all lessons in this chapter are complete
+        checkAndAutoUnlockNextChapter(studentId, lessonId).catch(() => {});
       }
 
       return json({ data }, 201);
@@ -891,6 +940,79 @@ export async function submitQuiz(req: NextRequest, quizId: string) {
     return json({ data }, 201);
   } catch (error) {
     return json({ error: error instanceof Error ? error.message : "Unable to submit quiz" }, 500);
+  }
+}
+
+// ───── checkAndAutoUnlockNextChapter ─────
+export async function checkAndAutoUnlockNextChapter(studentId: string, lessonId: string) {
+  try {
+    const supabaseAdmin = getSupabaseAdmin();
+    const { data: lesson } = await supabaseAdmin
+      .from("lessons")
+      .select("chapter_id")
+      .eq("id", lessonId)
+      .is("deleted_at", null)
+      .maybeSingle();
+    if (!lesson) return;
+    const { data: chapter } = await supabaseAdmin
+      .from("chapters")
+      .select("subject_id,sort_order")
+      .eq("id", lesson.chapter_id)
+      .is("deleted_at", null)
+      .maybeSingle();
+    if (!chapter) return;
+    const { data: chapterLessons } = await supabaseAdmin
+      .from("lessons")
+      .select("id")
+      .eq("chapter_id", lesson.chapter_id)
+      .is("deleted_at", null);
+    const chapterLessonIds = (chapterLessons || []).map((l: { id: string }) => l.id);
+    if (chapterLessonIds.length === 0) return;
+    const { data: completedRows } = await supabaseAdmin
+      .from("lesson_progress")
+      .select("lesson_id")
+      .eq("student_id", studentId)
+      .in("lesson_id", chapterLessonIds)
+      .eq("status", "completed")
+      .is("deleted_at", null);
+    const completedCount = completedRows?.length || 0;
+    if (completedCount < chapterLessonIds.length) return;
+    const { data: nextChapter } = await supabaseAdmin
+      .from("chapters")
+      .select("id,name")
+      .eq("subject_id", chapter.subject_id)
+      .eq("sort_order", chapter.sort_order + 1)
+      .is("deleted_at", null)
+      .maybeSingle();
+    if (!nextChapter) return;
+    const { data: nextChapterLessons } = await supabaseAdmin
+      .from("lessons")
+      .select("id,title")
+      .eq("chapter_id", nextChapter.id)
+      .is("deleted_at", null);
+    if (!nextChapterLessons || nextChapterLessons.length === 0) return;
+    const nextLessonIds = nextChapterLessons.map((l: { id: string }) => l.id);
+    const { data: existingProgress } = await supabaseAdmin
+      .from("lesson_progress")
+      .select("lesson_id")
+      .eq("student_id", studentId)
+      .in("lesson_id", nextLessonIds)
+      .is("deleted_at", null);
+    const existingLessonIds = new Set((existingProgress || []).map((p: { lesson_id: string }) => p.lesson_id));
+    const inserts = nextChapterLessons
+      .filter((l: { id: string }) => !existingLessonIds.has(l.id))
+      .map((l: { id: string }) => ({
+        student_id: studentId,
+        lesson_id: l.id,
+        status: "not_started" as const,
+        completion_percentage: 0,
+        last_accessed_at: new Date().toISOString(),
+      }));
+    if (inserts.length > 0) {
+      await supabaseAdmin.from("lesson_progress").insert(inserts);
+    }
+  } catch {
+    // silent
   }
 }
 

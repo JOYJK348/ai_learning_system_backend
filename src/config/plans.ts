@@ -1,3 +1,31 @@
+import { Plan } from "@/lib/subscriptions";
+import { getAllPlans } from "@/lib/subscriptions";
+
+// Cache plans in memory for 5 minutes to avoid DB calls on every request
+let cachedPlans: Plan[] | null = null;
+let cacheTime = 0;
+const CACHE_TTL = 5 * 60 * 1000;
+
+export async function getPlans(): Promise<Plan[]> {
+  if (cachedPlans && Date.now() - cacheTime < CACHE_TTL) {
+    return cachedPlans;
+  }
+  cachedPlans = await getAllPlans();
+  cacheTime = Date.now();
+  return cachedPlans;
+}
+
+export async function getPlanByCode(code: string): Promise<Plan | undefined> {
+  const plans = await getPlans();
+  return plans.find((p) => p.code === code);
+}
+
+export async function getPlanById(id: number): Promise<Plan | undefined> {
+  const plans = await getPlans();
+  return plans.find((p) => p.id === id);
+}
+
+// Keep backward-compat for school-admin routes
 export type PlanFeature = {
   key: string;
   label: string;
@@ -12,57 +40,66 @@ export type PlanConfig = {
   desc: string;
   days: number;
   typeId: number;
+  badge_label: string | null;
+  max_students: number | null;
   features: PlanFeature[];
 };
 
 export const PLANS: PlanConfig[] = [
   {
     type: 'free',
-    name: 'Free',
+    name: 'Basic',
     price: 0,
     displayPrice: '₹0',
     period: 'forever',
-    desc: 'For small schools getting started',
+    desc: 'Essential digital learning tools to get your school started',
     days: 0,
     typeId: 1,
+    badge_label: null,
+    max_students: 50,
     features: [
       { key: 'videos', label: 'Video Lessons' },
-      { key: 'quizzes', label: 'Quizzes' },
-      { key: 'activities', label: 'Activities' },
+      { key: 'quizzes', label: 'Quizzes & Assessments' },
+      { key: 'activities', label: 'Interactive Activities' },
     ],
   },
   {
     type: 'paid',
-    name: 'Paid',
+    name: 'Standard',
     price: 1999,
     displayPrice: '₹1,999',
     period: '/month',
-    desc: 'For growing schools with more needs',
+    desc: 'Advanced analytics and reporting for data-driven schools',
     days: 30,
     typeId: 2,
+    badge_label: 'Most Popular',
+    max_students: 200,
     features: [
       { key: 'videos', label: 'Video Lessons' },
-      { key: 'quizzes', label: 'Quizzes' },
-      { key: 'activities', label: 'Activities' },
+      { key: 'quizzes', label: 'Quizzes & Assessments' },
+      { key: 'activities', label: 'Interactive Activities' },
       { key: 'reports', label: 'Reports & Analytics' },
     ],
   },
   {
     type: 'school',
-    name: 'School',
+    name: 'Premium',
     price: 3000,
     displayPrice: '₹3,000',
     period: '/month',
-    desc: 'Full platform access for your school',
+    desc: 'Complete platform with AI-powered tutoring and bulk management',
     days: 365,
     typeId: 3,
+    badge_label: 'Best Value',
+    max_students: null,
     features: [
       { key: 'videos', label: 'Video Lessons' },
-      { key: 'quizzes', label: 'Quizzes' },
-      { key: 'activities', label: 'Activities' },
+      { key: 'quizzes', label: 'Quizzes & Assessments' },
+      { key: 'activities', label: 'Interactive Activities' },
       { key: 'reports', label: 'Reports & Analytics' },
       { key: 'ai_tutor', label: 'AI Tutor' },
       { key: 'bulk_import', label: 'Bulk Student Import' },
+      { key: 'dedicated_support', label: 'Dedicated Support' },
     ],
   },
 ];

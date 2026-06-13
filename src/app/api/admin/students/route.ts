@@ -131,40 +131,45 @@ export async function GET(req: NextRequest) {
       }
     });
 
-    // Enrich students
-    const data = students.map((student) => {
-      const schoolInfo = schoolStudentMap[student.id];
-      const parentId = parentLinkMap[student.id];
-      const parentInfo = parentId ? parentMap[parentId] : undefined;
+    // Enrich students, filter to only individual (non-school) students
+    const data = students
+      .map((student) => {
+        const schoolInfo = schoolStudentMap[student.id];
+        const parentId = parentLinkMap[student.id];
+        const parentInfo = parentId ? parentMap[parentId] : undefined;
 
-      // Calculate avg score
-      const avgScore =
-        student.total_quizzes_attempted > 0
-          ? Math.round((student.total_quizzes_passed / student.total_quizzes_attempted) * 100)
-          : 0;
+        // Calculate avg score
+        const avgScore =
+          student.total_quizzes_attempted > 0
+            ? Math.round((student.total_quizzes_passed / student.total_quizzes_attempted) * 100)
+            : 0;
 
-      return {
-        id: student.id,
-        name: student.full_name,
-        email: student.auth_user_id ? authUserMap[student.auth_user_id] || null : null,
-        date_of_birth: student.date_of_birth,
-        grade_id: student.grade_id,
-        grade_name: student.grade_id ? gradeMap[student.grade_id] || null : null,
-        school_id: schoolInfo?.school_id || null,
-        school_name: schoolInfo?.school_id ? schoolMap[schoolInfo.school_id] || null : null,
-        parent_id: parentId || null,
-        parent_name: parentInfo?.name || null,
-        photo_url: student.profile_photo_url,
-        status_id: student.status_id,
-        total_stars: student.total_stars_earned || 0,
-        badges_count: student.total_badges_earned || 0,
-        lessons_completed: student.total_lessons_completed || 0,
-        quizzes_taken: student.total_quizzes_attempted || 0,
-        avg_score: avgScore,
-        last_active: student.last_activity_at,
-        created_at: student.created_at,
-      };
-    });
+        return {
+          id: student.id,
+          name: student.full_name,
+          email: student.auth_user_id ? authUserMap[student.auth_user_id] || null : null,
+          date_of_birth: student.date_of_birth,
+          grade_id: student.grade_id,
+          grade_name: student.grade_id ? gradeMap[student.grade_id] || null : null,
+          school_id: schoolInfo?.school_id || null,
+          school_name: schoolInfo?.school_id ? schoolMap[schoolInfo.school_id] || null : null,
+          section: schoolInfo?.section || null,
+          parent_id: parentId || null,
+          parent_name: parentInfo?.name || null,
+          photo_url: student.profile_photo_url,
+          status_id: student.status_id,
+          overall_progress: student.overall_progress || 0,
+          total_stars: student.total_stars_earned || 0,
+          badges_count: student.total_badges_earned || 0,
+          current_streak_days: student.current_streak_days || 0,
+          lessons_completed: student.total_lessons_completed || 0,
+          quizzes_taken: student.total_quizzes_attempted || 0,
+          avg_score: avgScore,
+          last_active: student.last_activity_at,
+          created_at: student.created_at,
+        };
+      })
+      .filter((s) => !s.school_id);
 
     return json({ data });
   } catch (error) {

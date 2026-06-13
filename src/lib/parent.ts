@@ -638,3 +638,91 @@ export async function getParentDashboard(req: NextRequest) {
   }
 }
 
+// ───── getParentChildChapterProgress ─────
+export async function getParentChildChapterProgress(req: NextRequest, studentId: string) {
+  const user = await requireParent(req);
+  if (!user) return json({ error: "Forbidden" }, 403);
+
+  try {
+    const supabaseAdmin = getSupabaseAdmin();
+    const student = await loadStudentForParent(supabaseAdmin, user.profileId, studentId);
+    if (!student) return json({ error: "Child not found" }, 404);
+
+    if (!student.grade_id) return json({ data: [] });
+
+    const { data: subjects } = await supabaseAdmin
+      .from("subjects")
+      .select("id,name")
+      .eq("grade_id", student.grade_id)
+      .is("deleted_at", null)
+      .order("sort_order", { ascending: true });
+
+    if (!subjects || subjects.length === 0) return json({ data: [] });
+
+    const subjectIds = subjects.map((s) => s.id);
+    const { data: chapters } = await supabaseAdmin
+      .from("chapters")
+      .select("id,subject_id,name,sort_order")
+      .in("subject_id", subjectIds)
+      .is("deleted_at", null)
+      .order("sort_order", { ascending: true });
+
+    const chapterIds = (chapters || []).map((c) => c.id);
+    if (chapterIds.length === 0) return json({ data: [] });
+
+    const { data: lessons } = await supabaseAdmin
+      .from("lessons")
+      .select("id,chapter_id,title")
+      .in("chapter_id", chapterIds)
+      .is("deleted_at", null);
+
+    if (!lessons || lessons.length === 0) return json({ data: [] });
+
+    const lessonIds = lessons.map((l) => l.id);
+    const { data: progressRows } = await supabaseAdmin
+      .from("lesson_progress")
+      .select("lesson_id,status,completion_percentage,completed_at,time_spent_seconds")
+      .eq("student_id", studentId)
+      .in("lesson_id", lessonIds)
+      .is("deleted_at", null);
+
+    const progressMap: Record<string, NonNullable<typeof progressRows>[0]> = {};
+    (progressRows || []).forEach((p) => { progressMap[p.lesson_id] = p; });
+
+    const lessonCountPerChapter: Record<string, number> = {};
+    const completedLessonCountPerChapter: Record<string, number> = {};
+    const totalTimePerChapter: Record<string, number> = {};
+    lessons.forEach((l) => {
+      lessonCountPerChapter[l.chapter_id] = (lessonCountPerChapter[l.chapter_id] || 0) + 1;
+      const p = progressMap[l.id];
+      if (p) {
+        if (p.status === "completed") completedLessonCountPerChapter[l.chapter_id] = (completedLessonCountPerChapter[l.chapter_id] || 0) + 1;
+        totalTimePerChapter[l.chapter_id] = (totalTimePerChapter[l.chapter_id] || 0) + (p.time_spent_seconds || 0);
+      }
+    });
+
+    const data = subjects.map((subject) => {
+      const subjectChapters = (chapters || []).filter((c) => c.subject_id === subject.id);
+      const chapterData = subjectChapters.map((chapter) => {
+        const total = lessonCountPerChapter[chapter.id] || 0;
+        const completed = completedLessonCountPerChapter[chapter.id] || 0;
+        return {
+          id: chapter.id,
+          name: chapter.name,
+          sort_order: chapter.sort_order,
+          total_lessons: total,
+          completed_lessons: completed,
+          completion_percentage: total > 0 ? Math.round((completed / total) * 100) : 0,
+          total_time_spent_seconds: totalTimePerChapter[chapter.id] || 0,
+          is_complete: total > 0 && completed >= total,
+        };
+      });
+      return { id: subject.id, name: subject.name, chapters: chapterData };
+    });
+
+    return json({ data });
+  } catch (error) {
+    return json({ error: error instanceof Error ? error.message : "Unable to load chapter progress" }, 500);
+  }
+}
+

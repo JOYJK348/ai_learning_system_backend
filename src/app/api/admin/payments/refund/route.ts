@@ -17,27 +17,25 @@ export async function POST(req: NextRequest) {
     const supabase = getSupabaseAdmin();
 
     // Get payment details
-    const { data: payment } = await supabase
-      .from("payments")
-      .select("id, amount, parent_id, payment_status_id")
+    const { data: payment, error: getError } = await supabase
+      .from("parent_payments")
+      .select("*")
       .eq("id", payment_id)
-      .is("deleted_at", null)
       .single();
 
-    if (!payment) return json({ error: "Payment not found" }, 404);
+    if (getError || !payment) return json({ error: "Payment not found" }, 404);
 
-    // payment_status_id=4 → 'refunded'
-    if (payment.payment_status_id === 4) {
+    if (payment.status === "refunded") {
       return json({ error: "Already refunded" }, 400);
     }
 
     // Mark as refunded
     const { data, error } = await supabase
-      .from("payments")
+      .from("parent_payments")
       .update({
-        payment_status_id: 4,
+        status: "refunded",
+        failure_reason: `Refunded by admin ${user!.profileId}`,
         updated_at: new Date().toISOString(),
-        notes: `Refunded by admin ${user!.profileId} on ${new Date().toISOString()}`,
       })
       .eq("id", payment_id)
       .select()
@@ -48,14 +46,11 @@ export async function POST(req: NextRequest) {
     // Log to admin activity logs
     await supabase.from("admin_activity_logs").insert({
       admin_id: user!.profileId,
-      action_id: 3, // delete/reverse
+      action_id: 3,
       entity_type: "payments",
       entity_id: payment_id,
       details: { amount: payment.amount, parent_id: payment.parent_id },
     });
-
-    // TODO: Process actual refund via Razorpay/Stripe
-    // await razorpay.refund(payment.gateway_payment_id);
 
     return json({ data, message: "Refund processed" });
   } catch (error: any) {

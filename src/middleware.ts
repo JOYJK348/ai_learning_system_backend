@@ -41,7 +41,7 @@ export async function middleware(req: NextRequest) {
     });
   }
 
-  if (pathname.startsWith("/api/auth/")) return withCors(req, NextResponse.next());
+  if (pathname.startsWith("/api/auth/") || pathname.startsWith("/api/seed/") || pathname === "/api/register-parent") return withCors(req, NextResponse.next());
   if (publicApiPrefixes.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`))) {
     return withCors(req, NextResponse.next());
   }

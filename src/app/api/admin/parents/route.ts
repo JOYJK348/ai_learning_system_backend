@@ -27,6 +27,9 @@ export async function GET(req: NextRequest) {
     if (!includeDeleted) query = query.is("deleted_at", null);
     if (user.role === "school_admin" && user.schoolId) {
       query = query.eq("school_id", user.schoolId);
+    } else {
+      // Only show individual (non-school) parents in admin panel
+      query = query.is("school_id", null);
     }
 
     const { data: parents, error: parentsError } = await query;

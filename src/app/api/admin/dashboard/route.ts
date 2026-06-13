@@ -54,6 +54,7 @@ export async function GET(req: NextRequest) {
       revenueTrendRes,
       pendingPaymentsRes,
       pendingApprovalsRes,
+      parentRegistrationsPendingRes,
       parentExpiringRes,
       schoolExpiringRes,
       lessonProgressRes,
@@ -82,6 +83,7 @@ export async function GET(req: NextRequest) {
         .order("paid_at", { ascending: true }),
       supabase.from("payments").select("*", { count: "exact", head: true }).eq("payment_status_id", 1).is("deleted_at", null),
       supabase.from("parents").select("*", { count: "exact", head: true }).eq("approval_status_id", 1).is("deleted_at", null),
+      supabase.from("parent_registrations").select("*", { count: "exact", head: true }).eq("status", "pending").is("deleted_at", null),
       supabase
         .from("parents")
         .select("*", { count: "exact", head: true })
@@ -131,6 +133,7 @@ export async function GET(req: NextRequest) {
       revenueTrendRes,
       pendingPaymentsRes,
       pendingApprovalsRes,
+      parentRegistrationsPendingRes,
       parentExpiringRes,
       schoolExpiringRes,
       lessonProgressRes,
@@ -243,7 +246,7 @@ export async function GET(req: NextRequest) {
           activity_trend: normalizeSeries(activitySeries)
         },
         alerts: {
-          pending_approvals: pendingApprovalsRes.count || 0,
+          pending_approvals: (pendingApprovalsRes.count || 0) + (parentRegistrationsPendingRes.count || 0),
           pending_payments: pendingPaymentsRes.count || 0,
           expiring_plans: (parentExpiringRes.count || 0) + (schoolExpiringRes.count || 0)
         },

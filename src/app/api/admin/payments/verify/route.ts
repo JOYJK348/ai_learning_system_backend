@@ -16,34 +16,41 @@ export async function POST(req: NextRequest) {
 
     const supabase = getSupabaseAdmin();
 
-    // payment_status_id=2 → 'success' in lookup_payment_status
-    const { data, error } = await supabase
-      .from("payments")
+    // Mark payment as success in parent_payments
+    const { data: payment, error: ppError } = await supabase
+      .from("parent_payments")
       .update({
-        payment_status_id: 2,
-        verified_by: user!.profileId,
+        status: "success",
+        confirmed_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       })
       .eq("id", payment_id)
-      .is("deleted_at", null)
       .select()
       .single();
 
-    if (error) return json({ error: error.message }, 500);
+    if (ppError) return json({ error: ppError.message }, 500);
 
-    // Activate parent plan if verified
-    if (data?.parent_id) {
+    // Activate parent subscription
+    if (payment?.parent_id) {
+      await supabase
+        .from("parent_subscriptions")
+        .update({ status: "active" })
+        .eq("parent_id", payment.parent_id)
+        .in("status", ["trial", "active"])
+        .order("created_at", { ascending: false })
+        .limit(1);
+
       await supabase
         .from("parents")
         .update({
-          status_id: 1,        // active
-          plan_status_id: 1,   // active
+          status_id: 1,
+          plan_status_id: 1,
           updated_at: new Date().toISOString(),
         })
-        .eq("id", data.parent_id);
+        .eq("id", payment.parent_id);
     }
 
-    return json({ data, message: "Payment verified" });
+    return json({ data: payment, message: "Payment verified" });
   } catch (error: any) {
     return json({ error: error.message || "Internal Server Error" }, 500);
   }

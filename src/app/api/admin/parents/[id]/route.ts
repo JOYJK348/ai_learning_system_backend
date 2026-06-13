@@ -38,8 +38,7 @@ export async function GET(
       supabaseAdmin
         .from("parent_student_links")
         .select("student_id,students(id,full_name,grade_id,profile_photo_url,total_lessons_completed,total_quizzes_attempted,total_quizzes_passed,total_stars_earned,status_id)")
-        .eq("parent_id", params.id)
-        .is("deleted_at", null),
+        .eq("parent_id", params.id),
       supabaseAdmin.from("lookup_plan_types").select("id,code,name"),
       supabaseAdmin.from("lookup_plan_status").select("id,code,name,color"),
       supabaseAdmin.from("lookup_approval_status").select("id,code,name,color"),
@@ -75,7 +74,7 @@ export async function GET(
       created_at: pay.created_at,
     }));
 
-    // Enrich children with grade names
+    // Enrich children with grade names + school info
     const studentLinks = (linksRes.data || []).filter((l: any) => l.students);
     const gradeIds = Array.from(new Set(studentLinks.map((l: any) => l.students.grade_id).filter(Boolean)));
     let gradeMap: Record<string, string> = {};
@@ -84,11 +83,32 @@ export async function GET(
       (grades || []).forEach((g: any) => { gradeMap[g.id] = g.name; });
     }
 
+    // Fetch school info for each child
+    const studentIds = studentLinks.map((l: any) => l.students.id);
+    let schoolStudentsMap: Record<string, { school_id: string; section: string | null; roll_number: string | null }> = {};
+    if (studentIds.length > 0) {
+      const { data: ssData } = await supabaseAdmin
+        .from("school_students")
+        .select("student_id, school_id, section, roll_number")
+        .in("student_id", studentIds)
+        .is("deleted_at", null);
+      for (const ss of ssData || []) {
+        schoolStudentsMap[ss.student_id] = { school_id: ss.school_id, section: ss.section, roll_number: ss.roll_number };
+      }
+    }
+    const schoolIds = Array.from(new Set(Object.values(schoolStudentsMap).map((s) => s.school_id).filter(Boolean)));
+    let schoolMap: Record<string, string> = {};
+    if (schoolIds.length > 0) {
+      const { data: schools } = await supabaseAdmin.from("schools").select("id,name").in("id", schoolIds).is("deleted_at", null);
+      (schools || []).forEach((sc: any) => { schoolMap[sc.id] = sc.name; });
+    }
+
     const children = studentLinks.map((link: any) => {
       const s = link.students;
       const avgScore = s.total_quizzes_attempted > 0
         ? Math.round((s.total_quizzes_passed / s.total_quizzes_attempted) * 100)
         : 0;
+      const schoolInfo = schoolStudentsMap[s.id];
       return {
         id: s.id,
         name: s.full_name,
@@ -98,6 +118,9 @@ export async function GET(
         lessons_completed: s.total_lessons_completed || 0,
         avg_score: avgScore,
         status_id: s.status_id,
+        school_name: schoolInfo?.school_id ? schoolMap[schoolInfo.school_id] || null : null,
+        section: schoolInfo?.section || null,
+        roll_number: schoolInfo?.roll_number || null,
       };
     });
 
