@@ -1,0 +1,40 @@
+  ▲ Next.js 14.2.35
+  - Local:        http://localhost:3010
+  - Environments: .env.local
+
+ ✓ Starting...
+ ✓ Ready in 2.5s
+ ✓ Compiled /src/middleware in 258ms (72 modules)
+ ✓ Compiled /api/auth/me in 408ms (101 modules)
+ GET /api/auth/me 401 in 614ms
+ ⨯ Error: Missing NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY
+    at getSupabaseAdmin (webpack-internal:///(rsc)/./src/lib/supabase-server.ts:11:15)
+    at isTokenBlacklisted (webpack-internal:///(rsc)/./src/lib/auth-helpers.ts:140:93)
+    at getCurrentUser (webpack-internal:///(rsc)/./src/lib/auth-helpers.ts:200:25)
+    at GET (webpack-internal:///(rsc)/./src/app/api/auth/me/route.ts:8:89)
+    at D:\FreeLance\AI-LearningPortal\backend\node_modules\next\dist\compiled\next-server\app-route.runtime.dev.js:6:57234
+    at D:\FreeLance\AI-LearningPortal\backend\node_modules\next\dist\server\lib\trace\tracer.js:140:36
+    at NoopContextManager.with (D:\FreeLance\AI-LearningPortal\backend\node_modules\next\dist\compiled\@opentelemetry\api\index.js:1:7062)
+    at ContextAPI.with (D:\FreeLance\AI-LearningPortal\backend\node_modules\next\dist\compiled\@opentelemetry\api\index.js:1:518)
+    at NoopTracer.startActiveSpan (D:\FreeLance\AI-LearningPortal\backend\node_modules\next\dist\compiled\@opentelemetry\api\index.js:1:18093)
+    at ProxyTracer.startActiveSpan (D:\FreeLance\AI-LearningPortal\backend\node_modules\next\dist\compiled\@opentelemetry\api\index.js:1:18854)
+    at D:\FreeLance\AI-LearningPortal\backend\node_modules\next\dist\server\lib\trace\tracer.js:122:103
+    at NoopContextManager.with (D:\FreeLance\AI-LearningPortal\backend\node_modules\next\dist\compiled\@opentelemetry\api\index.js:1:7062)
+    at ContextAPI.with (D:\FreeLance\AI-LearningPortal\backend\node_modules\next\dist\compiled\@opentelemetry\api\index.js:1:518)
+    at NextTracerImpl.trace (D:\FreeLance\AI-LearningPortal\backend\node_modules\next\dist\server\lib\trace\tracer.js:122:28)
+    at D:\FreeLance\AI-LearningPortal\backend\node_modules\next\dist\compiled\next-server\app-route.runtime.dev.js:6:48896
+    at AsyncLocalStorage.run (node:internal/async_local_storage/async_hooks:91:14)
+    at Object.wrap (D:\FreeLance\AI-LearningPortal\backend\node_modules\next\dist\compiled\next-server\app-route.runtime.dev.js:6:40958)
+    at D:\FreeLance\AI-LearningPortal\backend\node_modules\next\dist\compiled\next-server\app-route.runtime.dev.js:6:47472
+    at AsyncLocalStorage.run (node:internal/async_local_storage/async_hooks:91:14)
+    at Object.wrap (D:\FreeLance\AI-LearningPortal\backend\node_modules\next\dist\compiled\next-server\app-route.runtime.dev.js:6:38293)
+    at D:\FreeLance\AI-LearningPortal\backend\node_modules\next\dist\compiled\next-server\app-route.runtime.dev.js:6:47434
+    at AsyncLocalStorage.run (node:internal/async_local_storage/async_hooks:91:14)
+    at eT.execute (D:\FreeLance\AI-LearningPortal\backend\node_modules\next\dist\compiled\next-server\app-route.runtime.dev.js:6:46881)
+    at eT.handle (D:\FreeLance\AI-LearningPortal\backend\node_modules\next\dist\compiled\next-server\app-route.runtime.dev.js:6:58771)
+    at doRender (D:\FreeLance\AI-LearningPortal\backend\node_modules\next\dist\server\base-server.js:1366:60)
+    at cacheEntry.responseCache.get.routeKind (D:\FreeLance\AI-LearningPortal\backend\node_modules\next\dist\server\base-server.js:1588:34)
+    at ResponseCache.get (D:\FreeLance\AI-LearningPortal\backend\node_modules\next\dist\server\response-cache\index.js:49:26)
+    at DevServer.renderToResponseWithComponentsImpl (D:\FreeLance\AI-LearningPortal\backend\node_modules\next\dist\server\base-server.js:1496:53)
+ GET /api/auth/me 500 in 141ms
+[?25h
