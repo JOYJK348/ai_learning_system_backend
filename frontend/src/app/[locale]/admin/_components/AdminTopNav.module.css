@@ -1,0 +1,136 @@
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  min-height: 5rem;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.05);
+  background: rgba(255, 255, 255, 0.9);
+  padding: 0 1rem;
+  backdrop-filter: blur(20px);
+}
+
+.brandIdentity {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.logo {
+  object-fit: contain;
+  flex-shrink: 0;
+}
+
+.brandTitle {
+  font-size: 0.95rem;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.brandMeta {
+  margin-top: 0.35rem;
+  font-size: 0.68rem;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #7c8798;
+}
+
+.search {
+  display: none;
+  min-height: 3rem;
+  flex: 1;
+  align-items: center;
+  gap: 0.75rem;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.82);
+  padding: 0 1rem;
+}
+
+.search input {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: #111827;
+  font-size: 0.9rem;
+  font-weight: 700;
+  outline: none;
+}
+
+.profile {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.profileText {
+  display: none;
+  text-align: right;
+}
+
+.iconButton {
+  display: inline-flex;
+  width: 3rem;
+  height: 3rem;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(15, 23, 42, 0.1);
+  border-radius: 0.875rem;
+  background: rgba(255, 255, 255, 0.82);
+  color: #475569;
+}
+
+.logoutButton {
+  display: inline-flex;
+  width: 3rem;
+  height: 3rem;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(15, 23, 42, 0.1);
+  border-radius: 0.875rem;
+  background: rgba(255, 255, 255, 0.82);
+  color: #475569;
+  cursor: pointer;
+}
+
+.logoutButton:hover {
+  background: rgba(248, 250, 252, 0.9);
+}
+
+.profileName {
+  font-size: 0.9rem;
+  font-weight: 950;
+}
+
+.avatar {
+  display: grid;
+  width: 3rem;
+  height: 3rem;
+  place-items: center;
+  border-radius: 1rem;
+  background: #12312f;
+  color: white;
+  font-size: 0.85rem;
+  font-weight: 900;
+}
+
+@media (min-width: 640px) {
+  .search,
+  .profileText {
+    display: flex;
+  }
+
+  .profileText {
+    flex-direction: column;
+  }
+}
+
+@media (min-width: 1024px) {
+  .topbar {
+    padding: 0 2rem;
+  }
+}

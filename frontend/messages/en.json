@@ -1,0 +1,9 @@
+{
+  "HomePage": {
+    "title": "Welcome to AI Animated Learning",
+    "description": "The future of education is here.",
+    "studentPortal": "Student Portal",
+    "parentPortal": "Parent Portal",
+    "adminPortal": "Admin Portal"
+  }
+}
