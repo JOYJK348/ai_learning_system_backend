@@ -63,7 +63,7 @@ const CHAPTER_DATA = {
         desc: 'Learn to identify circles, squares and triangles',
         youtube_id: 'Z0PzUJ1x1Mw',
         activities: [
-          { name: 'Shape Match', type: 'match', config: { pairs: [{ shape: 'Circle', emoji: '⭕' }, { shape: 'Square', emoji: '⬜' }, { shape: 'Triangle', emoji: '🔺' }] } },
+          { name: 'Shape Match', type: 'match', config: { pairs: [{ shape: 'Circle', emoji: '⭕' }, { shape: 'Square', emoji: '⬜' }, { shape: 'Triangle', emoji: '🔺' }, { shape: 'Star', emoji: '⭐' }, { shape: 'Heart', emoji: '❤️' }] } },
           { name: 'Find the Shape', type: 'tap_select', config: { prompt: 'Tap the Circle', options: [{ id: 'circle', label: '⭕ Circle' }, { id: 'square', label: '⬜ Square' }, { id: 'triangle', label: '🔺 Triangle' }], correct_id: 'circle' } },
         ],
         quizzes: [
@@ -80,6 +80,7 @@ const CHAPTER_DATA = {
         youtube_id: 'Z0PzUJ1x1Mw',
         activities: [
           { name: 'Shape Hunt', type: 'tap_select', config: { prompt: 'Tap the Star', options: [{ id: 'star', label: '⭐ Star' }, { id: 'diamond', label: '💎 Diamond' }, { id: 'heart', label: '❤️ Heart' }, { id: 'oval', label: '🥚 Oval' }], correct_id: 'star' } },
+          { name: 'More Shape Match', type: 'match', config: { pairs: [{ shape: 'Star', emoji: '⭐' }, { shape: 'Heart', emoji: '❤️' }, { shape: 'Diamond', emoji: '💎' }, { shape: 'Oval', emoji: '🥚' }, { shape: 'Rectangle', emoji: '📘' }] } },
         ],
         quizzes: [
           { title: 'Shapes 2 Quiz', questions: [

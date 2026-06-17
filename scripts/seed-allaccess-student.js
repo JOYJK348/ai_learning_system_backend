@@ -5,9 +5,9 @@ const SERVICE_ROLE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhY
 
 const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
 
-const EMAIL = 'allaccess@zhi.com';
-const PASSWORD = 'AllAccess123';
-const NAME = 'Super Star';
+const EMAIL = process.env.ALLACCESS_EMAIL || 'allaccess@zhi.com';
+const PASSWORD = process.env.ALLACCESS_PASSWORD || 'AllAccess123';
+const NAME = process.env.ALLACCESS_NAME || 'Super Star';
 
 async function ensureProgress(studentId, lessonId) {
   const { data: existing } = await supabase
@@ -49,6 +49,8 @@ async function ensureProgress(studentId, lessonId) {
 
 async function main() {
   console.log('=== Creating all-access student account ===');
+
+  if (!process.env.ALLACCESS_EMAIL) console.log('Using default seed email; set ALLACCESS_EMAIL to target your account');
 
   const { data: activeStatus } = await supabase
     .from('lookup_entity_status')

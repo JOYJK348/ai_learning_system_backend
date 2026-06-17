@@ -137,7 +137,7 @@ BEGIN
         INSERT INTO lessons (id, chapter_id, title, description, youtube_video_id, thumbnail_url, duration_seconds, sort_order, status_id)
         VALUES (l_id, ch_shapes, 'Circle, Square, Triangle', 'Learn to identify circles, squares and triangles', 'Z0PzUJ1x1Mw', 'https://img.youtube.com/vi/Z0PzUJ1x1Mw/hqdefault.jpg', 120, 1, active_id);
 
-        act_id := gen_random_uuid(); INSERT INTO activities (id, lesson_id, name, activity_type_id, config, sort_order, status_id) VALUES (act_id, l_id, 'Shape Match', match_id, '{"pairs":[{"shape":"Circle","emoji":"⭕"},{"shape":"Square","emoji":"⬜"},{"shape":"Triangle","emoji":"🔺"}]}', 1, active_id);
+        act_id := gen_random_uuid(); INSERT INTO activities (id, lesson_id, name, activity_type_id, config, sort_order, status_id) VALUES (act_id, l_id, 'Shape Match', match_id, '{"pairs":[{"shape":"Circle","emoji":"⭕"},{"shape":"Square","emoji":"⬜"},{"shape":"Triangle","emoji":"🔺"},{"shape":"Star","emoji":"⭐"},{"shape":"Heart","emoji":"❤️"}]}', 1, active_id);
         act_id := gen_random_uuid(); INSERT INTO activities (id, lesson_id, name, activity_type_id, config, sort_order, status_id) VALUES (act_id, l_id, 'Find the Shape', tap_id, '{"prompt":"Tap the Circle","options":[{"id":"circle","label":"⭕ Circle"},{"id":"square","label":"⬜ Square"},{"id":"triangle","label":"🔺 Triangle"}],"correct_id":"circle"}', 2, active_id);
 
         quiz_id := gen_random_uuid(); INSERT INTO quizzes (id, lesson_id, title, description, time_limit_seconds, difficulty_id, sort_order, status_id) VALUES (quiz_id, l_id, 'Shapes 1 Quiz', 'Circle, Square, Triangle', 60, easy_id, 1, active_id);
@@ -157,6 +157,7 @@ BEGIN
         VALUES (l_id, ch_shapes, 'Rectangle, Star, Diamond, Heart, Oval', 'Learn more shapes: rectangle, star, diamond, heart, oval', 'Z0PzUJ1x1Mw', 'https://img.youtube.com/vi/Z0PzUJ1x1Mw/hqdefault.jpg', 150, 2, active_id);
 
         act_id := gen_random_uuid(); INSERT INTO activities (id, lesson_id, name, activity_type_id, config, sort_order, status_id) VALUES (act_id, l_id, 'Shape Hunt', tap_id, '{"prompt":"Tap the Star","options":[{"id":"star","label":"⭐ Star"},{"id":"diamond","label":"💎 Diamond"},{"id":"heart","label":"❤️ Heart"},{"id":"oval","label":"🥚 Oval"}],"correct_id":"star"}', 1, active_id);
+        act_id := gen_random_uuid(); INSERT INTO activities (id, lesson_id, name, activity_type_id, config, sort_order, status_id) VALUES (act_id, l_id, 'More Shape Match', match_id, '{"pairs":[{"shape":"Star","emoji":"⭐"},{"shape":"Heart","emoji":"❤️"},{"shape":"Diamond","emoji":"💎"},{"shape":"Oval","emoji":"🥚"},{"shape":"Rectangle","emoji":"📘"}]}', 2, active_id);
 
         quiz_id := gen_random_uuid(); INSERT INTO quizzes (id, lesson_id, title, description, time_limit_seconds, difficulty_id, sort_order, status_id) VALUES (quiz_id, l_id, 'Shapes 2 Quiz', 'Rectangle, Star, Diamond, Heart, Oval', 60, easy_id, 1, active_id);
         q_id := gen_random_uuid(); INSERT INTO quiz_questions (id, quiz_id, question_text, question_type_id, points, sort_order, status_id) VALUES (q_id, quiz_id, 'A door is shaped like a ___?', mcq_id, 10, 1, active_id);
