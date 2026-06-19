@@ -27,7 +27,7 @@ DECLARE
     -- lesson UUIDs
     l_body_parts     UUID; l_five_senses    UUID; l_take_care      UUID;
     l_family_members UUID; l_my_home        UUID;
-    l_pet_wild       UUID; l_animal_sounds  UUID; l_animal_homes   UUID;
+    l_pet_wild       UUID; l_animal_homes   UUID;
     l_plant_parts    UUID; l_nature_things  UUID; l_seasons        UUID;
     l_land_transport UUID; l_air_water      UUID; l_traffic_rules  UUID;
     l_clean_habits   UUID; l_healthy_food   UUID; l_daily_routine  UUID;
@@ -189,31 +189,10 @@ BEGIN
     VALUES (q_id, quiz_id, 'Which animal is WILD?', mcq_id, 10, 2, active_id);
     INSERT INTO quiz_options (question_id, option_text, is_correct, sort_order) VALUES (q_id, 'Cat', false, 1), (q_id, 'Elephant', true, 2), (q_id, 'Fish', false, 3);
 
-    -- Lesson 3.2: Animal Sounds
-    l_animal_sounds := gen_random_uuid();
-    INSERT INTO lessons (id, chapter_id, title, description, youtube_video_id, thumbnail_url, duration_seconds, sort_order, status_id)
-    VALUES (l_animal_sounds, ch_animals, 'Animal Sounds', 'Learn the sounds that animals make', 'Z0PzUJ1x1Mw', 'https://img.youtube.com/vi/Z0PzUJ1x1Mw/hqdefault.jpg', 120, 2, active_id);
-
-    act_id := gen_random_uuid();
-    INSERT INTO activities (id, lesson_id, name, activity_type_id, config, sort_order, status_id)
-    VALUES (act_id, l_animal_sounds, 'Match Animal to Sound', match_id, '{"pairs":[{"animal":"Cow","sound":"Moo"},{"animal":"Dog","sound":"Bow Wow"},{"animal":"Cat","sound":"Meow"},{"animal":"Lion","sound":"Roar"}]}', 1, active_id);
-
-    quiz_id := gen_random_uuid();
-    INSERT INTO quizzes (id, lesson_id, title, description, time_limit_seconds, difficulty_id, sort_order, status_id)
-    VALUES (quiz_id, l_animal_sounds, 'Animal Sounds Quiz', 'What sound does it make?', 60, easy_id, 1, active_id);
-    q_id := gen_random_uuid();
-    INSERT INTO quiz_questions (id, quiz_id, question_text, question_type_id, points, sort_order, status_id)
-    VALUES (q_id, quiz_id, 'What sound does a cow make?', mcq_id, 10, 1, active_id);
-    INSERT INTO quiz_options (question_id, option_text, is_correct, sort_order) VALUES (q_id, 'Moo', true, 1), (q_id, 'Bow Wow', false, 2), (q_id, 'Meow', false, 3);
-    q_id := gen_random_uuid();
-    INSERT INTO quiz_questions (id, quiz_id, question_text, question_type_id, points, sort_order, status_id)
-    VALUES (q_id, quiz_id, 'What sound does a dog make?', mcq_id, 10, 2, active_id);
-    INSERT INTO quiz_options (question_id, option_text, is_correct, sort_order) VALUES (q_id, 'Meow', false, 1), (q_id, 'Moo', false, 2), (q_id, 'Bow Wow', true, 3);
-
-    -- Lesson 3.3: Animal Homes
+    -- Lesson 3.2: Animal Homes (moved from sort 3 to sort 2)
     l_animal_homes := gen_random_uuid();
     INSERT INTO lessons (id, chapter_id, title, description, youtube_video_id, thumbnail_url, duration_seconds, sort_order, status_id)
-    VALUES (l_animal_homes, ch_animals, 'Animal Homes', 'Learn where different animals live', 'Z0PzUJ1x1Mw', 'https://img.youtube.com/vi/Z0PzUJ1x1Mw/hqdefault.jpg', 120, 3, active_id);
+    VALUES (l_animal_homes, ch_animals, 'Animal Homes', 'Learn where different animals live', 'Z0PzUJ1x1Mw', 'https://img.youtube.com/vi/Z0PzUJ1x1Mw/hqdefault.jpg', 120, 2, active_id);
 
     act_id := gen_random_uuid();
     INSERT INTO activities (id, lesson_id, name, activity_type_id, config, sort_order, status_id)
