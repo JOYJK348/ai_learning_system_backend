@@ -13,11 +13,10 @@ DECLARE
 
     subj_id UUID;
 
-    ch_pre_writing  UUID; ch_swar      UUID; ch_vyanjan   UUID;
+    ch_swar      UUID; ch_vyanjan   UUID;
     ch_words        UUID; ch_speaking  UUID; ch_kavita    UUID;
     ch_pictures     UUID;
 
-    l_standing UUID; l_curves UUID;
     l_aa       UUID; l_ii_uu  UUID;
     l_kaganga  UUID; l_chavarga UUID;
     l_ghar     UUID; l_phal_jal UUID;
@@ -34,70 +33,16 @@ BEGIN
     END IF;
 
     -- ═══════════════════════════════════════════════════════════════════════════
-    -- CHAPTER 1: पूर्व लेखन अभ्यास (Pre-Writing)
-    -- ═══════════════════════════════════════════════════════════════════════════
-    ch_pre_writing := (SELECT id FROM chapters WHERE subject_id = subj_id AND name = 'पूर्व लेखन अभ्यास' AND deleted_at IS NULL);
-    IF ch_pre_writing IS NULL THEN
-        ch_pre_writing := gen_random_uuid();
-        INSERT INTO chapters (id, subject_id, name, sort_order, status_id)
-        VALUES (ch_pre_writing, subj_id, 'पूर्व लेखन अभ्यास', 1, active_id);
-    END IF;
-
-    -- Lesson 1.1: खड़ी और लेटी रेखा (Standing & Sleeping Lines)
-    l_standing := (SELECT id FROM lessons WHERE chapter_id = ch_pre_writing AND title = 'खड़ी और लेटी रेखा' AND deleted_at IS NULL);
-    IF l_standing IS NULL THEN
-        l_standing := gen_random_uuid();
-        INSERT INTO lessons (id, chapter_id, title, description, youtube_video_id, thumbnail_url, duration_seconds, sort_order, status_id)
-        VALUES (l_standing, ch_pre_writing, 'खड़ी और लेटी रेखा', 'Practice standing and sleeping lines', '', '', 120, 1, active_id);
-
-        act_id := gen_random_uuid();
-        INSERT INTO activities (id, lesson_id, name, activity_type_id, config, sort_order, status_id)
-        VALUES (act_id, l_standing, 'Standing Line Practice', tap_id, '{"prompt":"Which line stands UP (खड़ी रेखा)?","options":[{"id":"standing","label":"खड़ी रेखा"},{"id":"sleeping","label":"लेटी रेखा"},{"id":"curve","label":"वक्र रेखा"}],"correct_id":"standing"}', 1, active_id);
-
-        quiz_id := gen_random_uuid();
-        INSERT INTO quizzes (id, lesson_id, title, description, time_limit_seconds, difficulty_id, sort_order, status_id)
-        VALUES (quiz_id, l_standing, 'रेखा पहचान', 'Identify the lines!', 60, easy_id, 1, active_id);
-        q_id := gen_random_uuid();
-        INSERT INTO quiz_questions (id, quiz_id, question_text, question_type_id, points, sort_order, status_id)
-        VALUES (q_id, quiz_id, 'कौन सी रेखा सीधी खड़ी है? (Which line stands straight?)', mcq_id, 10, 1, active_id);
-        INSERT INTO quiz_options (question_id, option_text, is_correct, sort_order) VALUES (q_id, 'खड़ी रेखा', true, 1), (q_id, 'लेटी रेखा', false, 2), (q_id, 'वक्र रेखा', false, 3);
-        q_id := gen_random_uuid();
-        INSERT INTO quiz_questions (id, quiz_id, question_text, question_type_id, points, sort_order, status_id)
-        VALUES (q_id, quiz_id, 'कौन सी रेखा सोई हुई है? (Which line is sleeping?)', mcq_id, 10, 2, active_id);
-        INSERT INTO quiz_options (question_id, option_text, is_correct, sort_order) VALUES (q_id, 'लेटी रेखा', true, 1), (q_id, 'खड़ी रेखा', false, 2), (q_id, 'तिरछी रेखा', false, 3);
-    END IF;
-
-    -- Lesson 1.2: वक्र और तिरछी रेखा (Curves & Slanting Lines)
-    l_curves := (SELECT id FROM lessons WHERE chapter_id = ch_pre_writing AND title = 'वक्र और तिरछी रेखा' AND deleted_at IS NULL);
-    IF l_curves IS NULL THEN
-        l_curves := gen_random_uuid();
-        INSERT INTO lessons (id, chapter_id, title, description, youtube_video_id, thumbnail_url, duration_seconds, sort_order, status_id)
-        VALUES (l_curves, ch_pre_writing, 'वक्र और तिरछी रेखा', 'Practice curves and slanting lines', '', '', 120, 2, active_id);
-
-        act_id := gen_random_uuid();
-        INSERT INTO activities (id, lesson_id, name, activity_type_id, config, sort_order, status_id)
-        VALUES (act_id, l_curves, 'Curve Practice', tap_id, '{"prompt":"Which one is a CURVE (वक्र रेखा)?","options":[{"id":"curve","label":"वक्र रेखा"},{"id":"standing","label":"खड़ी रेखा"},{"id":"sleeping","label":"लेटी रेखा"}],"correct_id":"curve"}', 1, active_id);
-
-        quiz_id := gen_random_uuid();
-        INSERT INTO quizzes (id, lesson_id, title, description, time_limit_seconds, difficulty_id, sort_order, status_id)
-        VALUES (quiz_id, l_curves, 'वक्र रेखा पहचान', 'Find the curves!', 60, easy_id, 1, active_id);
-        q_id := gen_random_uuid();
-        INSERT INTO quiz_questions (id, quiz_id, question_text, question_type_id, points, sort_order, status_id)
-        VALUES (q_id, quiz_id, 'गोल घूमने वाली रेखा कौन सी है? (Which line goes round and round?)', mcq_id, 10, 1, active_id);
-        INSERT INTO quiz_options (question_id, option_text, is_correct, sort_order) VALUES (q_id, 'वक्र रेखा', true, 1), (q_id, 'सीधी रेखा', false, 2), (q_id, 'टेढ़ी रेखा', false, 3);
-    END IF;
-
-    -- ═══════════════════════════════════════════════════════════════════════════
-    -- CHAPTER 2: स्वर (Vowels)
+    -- CHAPTER 1: स्वर (Vowels)
     -- ═══════════════════════════════════════════════════════════════════════════
     ch_swar := (SELECT id FROM chapters WHERE subject_id = subj_id AND name = 'स्वर' AND deleted_at IS NULL);
     IF ch_swar IS NULL THEN
         ch_swar := gen_random_uuid();
         INSERT INTO chapters (id, subject_id, name, sort_order, status_id)
-        VALUES (ch_swar, subj_id, 'स्वर', 2, active_id);
+        VALUES (ch_swar, subj_id, 'स्वर', 1, active_id);
     END IF;
 
-    -- Lesson 2.1: स्वर अ और आ
+    -- Lesson 1.1: स्वर अ और आ
     l_aa := (SELECT id FROM lessons WHERE chapter_id = ch_swar AND title = 'अ और आ' AND deleted_at IS NULL);
     IF l_aa IS NULL THEN
         l_aa := gen_random_uuid();
@@ -121,7 +66,7 @@ BEGIN
         INSERT INTO quiz_options (question_id, option_text, is_correct, sort_order) VALUES (q_id, 'आम', true, 1), (q_id, 'अनार', false, 2), (q_id, 'उल्लू', false, 3);
     END IF;
 
-    -- Lesson 2.2: स्वर इ से ऊ
+    -- Lesson 1.2: स्वर इ से ऊ
     l_ii_uu := (SELECT id FROM lessons WHERE chapter_id = ch_swar AND title = 'इ से ऊ' AND deleted_at IS NULL);
     IF l_ii_uu IS NULL THEN
         l_ii_uu := gen_random_uuid();
@@ -146,16 +91,16 @@ BEGIN
     END IF;
 
     -- ═══════════════════════════════════════════════════════════════════════════
-    -- CHAPTER 3: व्यंजन (Consonants)
+    -- CHAPTER 2: व्यंजन (Consonants)
     -- ═══════════════════════════════════════════════════════════════════════════
     ch_vyanjan := (SELECT id FROM chapters WHERE subject_id = subj_id AND name = 'व्यंजन' AND deleted_at IS NULL);
     IF ch_vyanjan IS NULL THEN
         ch_vyanjan := gen_random_uuid();
         INSERT INTO chapters (id, subject_id, name, sort_order, status_id)
-        VALUES (ch_vyanjan, subj_id, 'व्यंजन', 3, active_id);
+        VALUES (ch_vyanjan, subj_id, 'व्यंजन', 2, active_id);
     END IF;
 
-    -- Lesson 3.1: क वर्ग (क ख ग घ)
+    -- Lesson 2.1: क वर्ग (क ख ग घ)
     l_kaganga := (SELECT id FROM lessons WHERE chapter_id = ch_vyanjan AND title = 'क ख ग घ' AND deleted_at IS NULL);
     IF l_kaganga IS NULL THEN
         l_kaganga := gen_random_uuid();
@@ -179,7 +124,7 @@ BEGIN
         INSERT INTO quiz_options (question_id, option_text, is_correct, sort_order) VALUES (q_id, 'गाय', true, 1), (q_id, 'घर', false, 2), (q_id, 'खरगोश', false, 3);
     END IF;
 
-    -- Lesson 3.2: च वर्ग (च छ ज)
+    -- Lesson 2.2: च वर्ग (च छ ज)
     l_chavarga := (SELECT id FROM lessons WHERE chapter_id = ch_vyanjan AND title = 'च छ ज' AND deleted_at IS NULL);
     IF l_chavarga IS NULL THEN
         l_chavarga := gen_random_uuid();
@@ -204,16 +149,16 @@ BEGIN
     END IF;
 
     -- ═══════════════════════════════════════════════════════════════════════════
-    -- CHAPTER 4: सरल शब्द (Simple Words)
+    -- CHAPTER 3: सरल शब्द (Simple Words)
     -- ═══════════════════════════════════════════════════════════════════════════
     ch_words := (SELECT id FROM chapters WHERE subject_id = subj_id AND name = 'सरल शब्द' AND deleted_at IS NULL);
     IF ch_words IS NULL THEN
         ch_words := gen_random_uuid();
         INSERT INTO chapters (id, subject_id, name, sort_order, status_id)
-        VALUES (ch_words, subj_id, 'सरल शब्द', 4, active_id);
+        VALUES (ch_words, subj_id, 'सरल शब्द', 3, active_id);
     END IF;
 
-    -- Lesson 4.1: घर और फल
+    -- Lesson 3.1: घर और फल
     l_ghar := (SELECT id FROM lessons WHERE chapter_id = ch_words AND title = 'घर और फल' AND deleted_at IS NULL);
     IF l_ghar IS NULL THEN
         l_ghar := gen_random_uuid();
@@ -237,7 +182,7 @@ BEGIN
         INSERT INTO quiz_options (question_id, option_text, is_correct, sort_order) VALUES (q_id, 'जल', true, 1), (q_id, 'वन', false, 2), (q_id, 'फल', false, 3);
     END IF;
 
-    -- Lesson 4.2: जल और वन
+    -- Lesson 3.2: जल और वन
     l_phal_jal := (SELECT id FROM lessons WHERE chapter_id = ch_words AND title = 'जल और वन' AND deleted_at IS NULL);
     IF l_phal_jal IS NULL THEN
         l_phal_jal := gen_random_uuid();
@@ -262,16 +207,16 @@ BEGIN
     END IF;
 
     -- ═══════════════════════════════════════════════════════════════════════════
-    -- CHAPTER 5: बोलना (Speaking)
+    -- CHAPTER 4: बोलना (Speaking)
     -- ═══════════════════════════════════════════════════════════════════════════
     ch_speaking := (SELECT id FROM chapters WHERE subject_id = subj_id AND name = 'बोलना' AND deleted_at IS NULL);
     IF ch_speaking IS NULL THEN
         ch_speaking := gen_random_uuid();
         INSERT INTO chapters (id, subject_id, name, sort_order, status_id)
-        VALUES (ch_speaking, subj_id, 'बोलना', 5, active_id);
+        VALUES (ch_speaking, subj_id, 'बोलना', 4, active_id);
     END IF;
 
-    -- Lesson 5.1: नमस्ते और परिचय
+    -- Lesson 4.1: नमस्ते और परिचय
     l_namaste := (SELECT id FROM lessons WHERE chapter_id = ch_speaking AND title = 'नमस्ते और परिचय' AND deleted_at IS NULL);
     IF l_namaste IS NULL THEN
         l_namaste := gen_random_uuid();
@@ -291,7 +236,7 @@ BEGIN
         INSERT INTO quiz_options (question_id, option_text, is_correct, sort_order) VALUES (q_id, 'Hello / Greetings', true, 1), (q_id, 'Goodbye', false, 2), (q_id, 'Thank you', false, 3);
     END IF;
 
-    -- Lesson 5.2: मेरा परिवार
+    -- Lesson 4.2: मेरा परिवार
     l_mammi_papa := (SELECT id FROM lessons WHERE chapter_id = ch_speaking AND title = 'मेरा परिवार' AND deleted_at IS NULL);
     IF l_mammi_papa IS NULL THEN
         l_mammi_papa := gen_random_uuid();
@@ -312,16 +257,16 @@ BEGIN
     END IF;
 
     -- ═══════════════════════════════════════════════════════════════════════════
-    -- CHAPTER 6: कविताएँ और कहानियाँ (Rhymes & Stories)
+    -- CHAPTER 5: कविताएँ और कहानियाँ (Rhymes & Stories)
     -- ═══════════════════════════════════════════════════════════════════════════
     ch_kavita := (SELECT id FROM chapters WHERE subject_id = subj_id AND name = 'कविताएँ और कहानियाँ' AND deleted_at IS NULL);
     IF ch_kavita IS NULL THEN
         ch_kavita := gen_random_uuid();
         INSERT INTO chapters (id, subject_id, name, sort_order, status_id)
-        VALUES (ch_kavita, subj_id, 'कविताएँ और कहानियाँ', 6, active_id);
+        VALUES (ch_kavita, subj_id, 'कविताएँ और कहानियाँ', 5, active_id);
     END IF;
 
-    -- Lesson 6.1: प्रिय कविताएँ
+    -- Lesson 5.1: प्रिय कविताएँ
     l_rhymes := (SELECT id FROM lessons WHERE chapter_id = ch_kavita AND title = 'प्रिय कविताएँ' AND deleted_at IS NULL);
     IF l_rhymes IS NULL THEN
         l_rhymes := gen_random_uuid();
@@ -341,7 +286,7 @@ BEGIN
         INSERT INTO quiz_options (question_id, option_text, is_correct, sort_order) VALUES (q_id, 'कविता', true, 1), (q_id, 'कहानी', false, 2), (q_id, 'गीत', false, 3);
     END IF;
 
-    -- Lesson 6.2: छोटी कहानियाँ
+    -- Lesson 5.2: छोटी कहानियाँ
     l_moral_stories := (SELECT id FROM lessons WHERE chapter_id = ch_kavita AND title = 'छोटी कहानियाँ' AND deleted_at IS NULL);
     IF l_moral_stories IS NULL THEN
         l_moral_stories := gen_random_uuid();
@@ -362,16 +307,16 @@ BEGIN
     END IF;
 
     -- ═══════════════════════════════════════════════════════════════════════════
-    -- CHAPTER 7: चित्र पहचान (Picture Recognition)
+    -- CHAPTER 6: चित्र पहचान (Picture Recognition)
     -- ═══════════════════════════════════════════════════════════════════════════
     ch_pictures := (SELECT id FROM chapters WHERE subject_id = subj_id AND name = 'चित्र पहचान' AND deleted_at IS NULL);
     IF ch_pictures IS NULL THEN
         ch_pictures := gen_random_uuid();
         INSERT INTO chapters (id, subject_id, name, sort_order, status_id)
-        VALUES (ch_pictures, subj_id, 'चित्र पहचान', 7, active_id);
+        VALUES (ch_pictures, subj_id, 'चित्र पहचान', 6, active_id);
     END IF;
 
-    -- Lesson 7.1: जानवर पहचान
+    -- Lesson 6.1: जानवर पहचान
     l_janwar := (SELECT id FROM lessons WHERE chapter_id = ch_pictures AND title = 'जानवर पहचान' AND deleted_at IS NULL);
     IF l_janwar IS NULL THEN
         l_janwar := gen_random_uuid();
@@ -395,7 +340,7 @@ BEGIN
         INSERT INTO quiz_options (question_id, option_text, is_correct, sort_order) VALUES (q_id, 'फूल', true, 1), (q_id, 'पेड़', false, 2), (q_id, 'घर', false, 3);
     END IF;
 
-    -- Lesson 7.2: आस-पास की चीज़ें
+    -- Lesson 6.2: आस-पास की चीज़ें
     l_cheeze := (SELECT id FROM lessons WHERE chapter_id = ch_pictures AND title = 'आस-पास की चीज़ें' AND deleted_at IS NULL);
     IF l_cheeze IS NULL THEN
         l_cheeze := gen_random_uuid();
