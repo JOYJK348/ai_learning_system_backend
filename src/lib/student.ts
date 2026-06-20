@@ -328,7 +328,7 @@ export async function listStudentLessons(req: NextRequest) {
     const lessonIds = lessons.map((l) => l.id);
     const { data: progressRows } = await supabaseAdmin
       .from("lesson_progress")
-      .select("lesson_id,status,completion_percentage,time_spent_seconds,last_accessed_at")
+      .select("lesson_id,status,completion_percentage,time_spent_seconds,last_accessed_at,quiz_completed,quiz_score,quiz_max_score")
       .eq("student_id", studentId)
       .in("lesson_id", lessonIds)
       .is("deleted_at", null);
@@ -542,6 +542,8 @@ export async function updateLessonProgress(req: NextRequest, lessonId: string) {
     if (body.video_watched_seconds !== undefined) updateFields.video_watched_seconds = body.video_watched_seconds;
     if (body.activity_completed !== undefined) updateFields.activity_completed = body.activity_completed;
     if (body.quiz_completed !== undefined) updateFields.quiz_completed = body.quiz_completed;
+    if (body.quiz_score !== undefined) updateFields.quiz_score = body.quiz_score;
+    if (body.quiz_max_score !== undefined) updateFields.quiz_max_score = body.quiz_max_score;
 
     if (body.status === "completed") {
       updateFields.completed_at = now;
@@ -568,6 +570,8 @@ export async function updateLessonProgress(req: NextRequest, lessonId: string) {
         video_watched_seconds: body.video_watched_seconds || 0,
         activity_completed: body.activity_completed || false,
         quiz_completed: body.quiz_completed || false,
+        quiz_score: body.quiz_score !== undefined ? body.quiz_score : null,
+        quiz_max_score: body.quiz_max_score !== undefined ? body.quiz_max_score : null,
         last_accessed_at: now,
       };
       if (body.status === "completed") {
