@@ -225,7 +225,10 @@ export async function getProfileForAuthUser(authUserId: string): Promise<AuthUse
 }
 
 export async function getCurrentUser(req: NextRequest) {
-  const token = req.cookies.get(ACCESS_COOKIE)?.value;
+  let token = req.headers.get("Authorization")?.replace(/^Bearer\s+/, "");
+  if (!token) {
+    token = req.cookies.get(ACCESS_COOKIE)?.value;
+  }
   if (!token || (await isTokenBlacklisted(token))) return null;
 
   const supabase = getSupabase();

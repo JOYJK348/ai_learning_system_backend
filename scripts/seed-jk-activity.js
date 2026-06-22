@@ -133,11 +133,11 @@ async function seed() {
           const quiz = allQuizzes?.find(q => q.lesson_id === lesson.id);
           if (quiz) {
             const passed = Math.random() > 0.2;
-            const score = passed ? randomInt(7, 10) : randomInt(2, 6);
+            const score = passed ? randomInt(3, 5) : randomInt(1, 2);
             await supabase.from('quiz_attempts').insert({
               student_id: student.id, quiz_id: quiz.id, lesson_id: lesson.id,
-              attempt_number: 1, score, max_score: 10,
-              percentage: Math.round((score / 10) * 100), passed,
+              attempt_number: 1, score, max_score: 5,
+              percentage: Math.round((score / 5) * 100), passed,
               time_taken_seconds: randomInt(60, 600), completed_at: completedAt,
             }).maybeSingle();
             totalQA++;

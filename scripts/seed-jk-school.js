@@ -202,8 +202,8 @@ async function seed() {
           const quiz = allQuizzes.find(q => q.lesson_id === lesson.id);
           if (quiz) {
             const passed = Math.random() > 0.2;
-            const score = passed ? randomInt(7, 10) : randomInt(2, 6);
-            const maxScore = 10;
+            const score = passed ? randomInt(3, 5) : randomInt(1, 2);
+            const maxScore = 5;
 
             const { error: qaErr } = await supabase.from('quiz_attempts').insert({
               student_id: studentId, quiz_id: quiz.id, lesson_id: lesson.id,

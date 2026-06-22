@@ -154,7 +154,7 @@ async function main() {
     .update({
       overall_progress: 100,
       total_lessons_completed: totalLessons,
-      total_stars_earned: 500,
+      total_stars_earned: totalLessons * 5,
       total_badges_earned: 10,
       current_streak_days: 30,
       total_time_spent_seconds: totalLessons * 300

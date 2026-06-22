@@ -610,6 +610,7 @@ export async function updateLessonProgress(req: NextRequest, lessonId: string) {
             .from("students")
             .update({
               total_lessons_completed: newTotalLessons,
+              total_stars_earned: newTotalLessons * 5,
               overall_progress: newOverallProgress,
               last_activity_at: now,
               updated_at: now,
@@ -1123,5 +1124,92 @@ export async function listStudentTerms(req: NextRequest) {
     return json({ data });
   } catch (error) {
     return json({ error: error instanceof Error ? error.message : "Unable to load terms" }, 500);
+  }
+}
+
+// ───── submitQuizScore ─────
+// For the custom Quiz page which uses local hardcoded questions (no DB question IDs).
+// Accepts pre-computed score fields and inserts a quiz_attempts row directly.
+export async function submitQuizScore(req: NextRequest, quizId: string) {
+  const user = await requireStudent(req);
+  if (!user) return json({ error: "Forbidden" }, 403);
+
+  try {
+    const supabaseAdmin = getSupabaseAdmin();
+    const studentId = user.profileId;
+    const body = await req.json().catch(() => ({})) as JsonRecord;
+
+    const score = Number(body.score ?? 0);
+    const maxScore = Number(body.max_score ?? 5);
+    const timeTaken = Number(body.time_taken_seconds ?? 0);
+    const percentage = maxScore > 0 ? Math.round((score / maxScore) * 100) : 0;
+    const passed = percentage >= 60;
+
+    // Verify quiz exists
+    const { data: quiz, error: quizError } = await supabaseAdmin
+      .from("quizzes")
+      .select("id,lesson_id")
+      .eq("id", quizId)
+      .is("deleted_at", null)
+      .maybeSingle();
+
+    if (quizError) return json({ error: quizError.message }, 500);
+    if (!quiz) return json({ error: "Quiz not found" }, 404);
+
+    // Get next attempt number
+    const { data: prevAttempts } = await supabaseAdmin
+      .from("quiz_attempts")
+      .select("attempt_number")
+      .eq("student_id", studentId)
+      .eq("quiz_id", quizId)
+      .is("deleted_at", null)
+      .order("attempt_number", { ascending: false })
+      .limit(1);
+
+    const attemptNumber = (prevAttempts?.[0]?.attempt_number || 0) + 1;
+    const now = new Date().toISOString();
+
+    const { data, error } = await supabaseAdmin
+      .from("quiz_attempts")
+      .insert({
+        student_id: studentId,
+        quiz_id: quizId,
+        lesson_id: quiz.lesson_id,
+        attempt_number: attemptNumber,
+        score,
+        max_score: maxScore,
+        percentage,
+        passed,
+        time_taken_seconds: timeTaken,
+        answers: [],
+        completed_at: now,
+      })
+      .select("id,quiz_id,attempt_number,score,max_score,percentage,passed,time_taken_seconds,completed_at,created_at")
+      .single();
+
+    if (error) return json({ error: error.message }, 400);
+
+    // Update student stats
+    const { data: studentRow } = await supabaseAdmin
+      .from("students")
+      .select("total_quizzes_attempted,total_quizzes_passed")
+      .eq("id", studentId)
+      .single();
+
+    if (studentRow) {
+      await supabaseAdmin
+        .from("students")
+        .update({
+          total_quizzes_attempted: (studentRow.total_quizzes_attempted || 0) + 1,
+          total_quizzes_passed: passed ? (studentRow.total_quizzes_passed || 0) + 1 : studentRow.total_quizzes_passed,
+          last_activity_at: now,
+          updated_at: now,
+        })
+        .eq("id", studentId);
+    }
+
+    return json({ data }, 201);
+  } catch (error) {
+    return json({ error: error instanceof Error ? error.message : "Unable to submit quiz score" }, 500);
   }
 }

@@ -263,7 +263,7 @@ export async function getParentChildQuizzes(req: NextRequest, studentId: string)
     const student = await loadStudentForParent(supabaseAdmin, user.profileId, studentId);
     if (!student) return json({ error: "Child not found" }, 404);
 
-    const { data, error } = await supabaseAdmin
+    const { data: attempts, error } = await supabaseAdmin
       .from("quiz_attempts")
       .select(
         "id,quiz_id,lesson_id,attempt_number,score,max_score,percentage,passed,time_taken_seconds,completed_at,created_at"
@@ -274,7 +274,72 @@ export async function getParentChildQuizzes(req: NextRequest, studentId: string)
 
     if (error) return json({ error: error.message }, 500);
 
-    return json({ quizzes: data || [] });
+    const attemptsList = attempts || [];
+    if (attemptsList.length === 0) {
+      return json({ quizzes: [] });
+    }
+
+    const quizIds = Array.from(new Set(attemptsList.map((a) => a.quiz_id).filter(Boolean) as string[]));
+    const lessonIds = Array.from(new Set(attemptsList.map((a) => a.lesson_id).filter(Boolean) as string[]));
+
+    const [quizzesRes, lessonsRes] = await Promise.all([
+      quizIds.length > 0
+        ? supabaseAdmin.from("quizzes").select("id,title,lesson_id").in("id", quizIds)
+        : Promise.resolve({ data: [] as any[] }),
+      lessonIds.length > 0
+        ? supabaseAdmin.from("lessons").select("id,title,chapter_id").in("id", lessonIds)
+        : Promise.resolve({ data: [] as any[] })
+    ]);
+
+    const quizzes = quizzesRes.data || [];
+    const lessons = lessonsRes.data || [];
+
+    const chapterIds = Array.from(new Set(lessons.map((l) => l.chapter_id).filter(Boolean) as string[]));
+    const chaptersRes = chapterIds.length > 0
+      ? await supabaseAdmin.from("chapters").select("id,name,subject_id").in("id", chapterIds)
+      : { data: [] as any[] };
+
+    const chapters = chaptersRes.data || [];
+
+    const subjectIds = Array.from(new Set(chapters.map((c) => c.subject_id).filter(Boolean) as string[]));
+    const subjectsRes = subjectIds.length > 0
+      ? await supabaseAdmin.from("subjects").select("id,name").in("id", subjectIds)
+      : { data: [] as any[] };
+
+    const subjects = subjectsRes.data || [];
+
+    const quizMap = (quizzes || []).reduce<Record<string, any>>((acc, q) => {
+      acc[q.id] = q;
+      return acc;
+    }, {});
+    const lessonMap = (lessons || []).reduce<Record<string, any>>((acc, l) => {
+      acc[l.id] = l;
+      return acc;
+    }, {});
+    const chapterMap = (chapters || []).reduce<Record<string, any>>((acc, c) => {
+      acc[c.id] = c;
+      return acc;
+    }, {});
+    const subjectMap = (subjects || []).reduce<Record<string, any>>((acc, s) => {
+      acc[s.id] = s;
+      return acc;
+    }, {});
+
+    const mappedAttempts = attemptsList.map((a) => {
+      const quiz = quizMap[a.quiz_id];
+      const lesson = lessonMap[a.lesson_id];
+      const chapter = lesson ? chapterMap[lesson.chapter_id] : null;
+      const subject = chapter ? subjectMap[chapter.subject_id] : null;
+
+      return {
+        ...a,
+        quiz_title: quiz?.title || "Quiz",
+        lesson_title: lesson?.title || "Lesson",
+        subject_name: subject?.name || "General"
+      };
+    });
+
+    return json({ quizzes: mappedAttempts });
   } catch (error) {
     return json({ error: error instanceof Error ? error.message : "Unable to load quiz attempts" }, 500);
   }
@@ -681,7 +746,7 @@ export async function getParentChildChapterProgress(req: NextRequest, studentId:
     const lessonIds = lessons.map((l) => l.id);
     const { data: progressRows } = await supabaseAdmin
       .from("lesson_progress")
-      .select("lesson_id,status,completion_percentage,completed_at,time_spent_seconds")
+      .select("lesson_id,status,completion_percentage,completed_at,time_spent_seconds,quiz_completed,quiz_score,quiz_max_score")
       .eq("student_id", studentId)
       .in("lesson_id", lessonIds)
       .is("deleted_at", null);
@@ -700,12 +765,27 @@ export async function getParentChildChapterProgress(req: NextRequest, studentId:
         totalTimePerChapter[l.chapter_id] = (totalTimePerChapter[l.chapter_id] || 0) + (p.time_spent_seconds || 0);
       }
     });
-
     const data = subjects.map((subject) => {
       const subjectChapters = (chapters || []).filter((c) => c.subject_id === subject.id);
       const chapterData = subjectChapters.map((chapter) => {
         const total = lessonCountPerChapter[chapter.id] || 0;
         const completed = completedLessonCountPerChapter[chapter.id] || 0;
+        const chapterLessons = (lessons || [])
+          .filter((l) => l.chapter_id === chapter.id)
+          .map((l) => {
+            const p = progressMap[l.id];
+            return {
+              id: l.id,
+              title: l.title,
+              status: p?.status || "not_started",
+              completion_percentage: p?.completion_percentage || 0,
+              completed_at: p?.completed_at || null,
+              quiz_completed: p?.quiz_completed || false,
+              quiz_score: p?.quiz_score ?? null,
+              quiz_max_score: p?.quiz_max_score ?? null,
+            };
+          });
+
         return {
           id: chapter.id,
           name: chapter.name,
@@ -715,6 +795,7 @@ export async function getParentChildChapterProgress(req: NextRequest, studentId:
           completion_percentage: total > 0 ? Math.round((completed / total) * 100) : 0,
           total_time_spent_seconds: totalTimePerChapter[chapter.id] || 0,
           is_complete: total > 0 && completed >= total,
+          lessons: chapterLessons,
         };
       });
       return { id: subject.id, name: subject.name, chapters: chapterData };

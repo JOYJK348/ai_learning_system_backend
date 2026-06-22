@@ -52,7 +52,11 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  const res = json({ user: profile });
+  const res = json({
+    user: profile,
+    access_token: data.session.access_token,
+    refresh_token: data.session.refresh_token
+  });
   setAuthCookies(res, data.session.access_token, data.session.refresh_token);
   await logAuthAttempt({ email, role: profile.role, success: true, ip, userAgent, userId: data.user.id });
   return res;
