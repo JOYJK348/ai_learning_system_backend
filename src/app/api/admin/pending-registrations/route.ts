@@ -27,24 +27,51 @@ export async function GET(req: NextRequest) {
       query = query.eq("status", status);
     }
 
-    const { data, error } = await query;
+    const { data: parentRegs, error: parentError } = await query;
+    if (parentError) return json({ error: parentError.message }, 500);
 
-    if (error) return json({ error: error.message }, 500);
+    const { data: schoolRegs, error: schoolError } = await supabaseAdmin
+      .from("school_registrations")
+      .select("id, school_name, admin_name, admin_email, admin_phone, address, city, board_name, status, rejection_reason, created_at")
+      .is("deleted_at", null)
+      .order("created_at", { ascending: false });
 
-    const data2 = (data || []).map((r: Record<string, unknown>) => ({
+    if (schoolError) return json({ error: schoolError.message }, 500);
+
+    const formattedParents = (parentRegs || []).map((r: any) => ({
       id: r.id,
       parent_name: r.parent_name,
       parent_email: r.parent_email,
       parent_phone: r.parent_phone,
       child_name: r.child_name,
-      grade: (r.grades as Record<string, unknown> | undefined)?.name || null,
-      school: (r.schools as Record<string, unknown> | undefined)?.name || null,
+      grade: r.grades?.name || null,
+      school: r.schools?.name || null,
       status: r.status,
       rejection_reason: r.rejection_reason,
       created_at: r.created_at,
+      is_school: false
     }));
 
-    return json({ data: data2 });
+    const formattedSchools = (schoolRegs || []).map((r: any) => ({
+      id: r.id,
+      parent_name: r.admin_name,
+      parent_email: r.admin_email,
+      parent_phone: r.admin_phone,
+      school_name: r.school_name,
+      board_name: r.board_name,
+      city: r.city,
+      address: r.address,
+      status: r.status,
+      rejection_reason: r.rejection_reason,
+      created_at: r.created_at,
+      is_school: true
+    }));
+
+    const merged = [...formattedParents, ...formattedSchools].sort(
+      (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    );
+
+    return json({ data: merged });
   } catch (err) {
     return json({ error: err instanceof Error ? err.message : "Failed to load" }, 500);
   }

@@ -175,6 +175,44 @@ export async function GET(req: NextRequest) {
       });
     }
 
+    // 7. Add school_registrations (pending school onboarding approvals)
+    try {
+      const { data: pendingSchools } = await supabase
+        .from("school_registrations")
+        .select("id, school_name, admin_name, admin_email, admin_phone, address, city, board_name, created_at, status")
+        .eq("status", "pending")
+        .is("deleted_at", null)
+        .order("created_at", { ascending: false });
+
+      for (const reg of pendingSchools || []) {
+        const daysSinceCreated = Math.floor(
+          (Date.now() - new Date(reg.created_at).getTime()) / (1000 * 60 * 60 * 24)
+        );
+        approvals.push({
+          id: reg.id,
+          parent_id: reg.id,
+          parent_name: reg.admin_name || "Unknown",
+          parent_email: reg.admin_email || "",
+          parent_phone: reg.admin_phone || "",
+          children_count: 0,
+          plan_selected: "pending_school",
+          plan_type_id: 3,
+          payment_status: "unpaid",
+          status: "pending",
+          is_pre_auth: true,
+          is_school: true,
+          school_name: reg.school_name,
+          address: reg.address,
+          city: reg.city,
+          board_name: reg.board_name,
+          created_at: reg.created_at,
+          urgency_score: Math.min(10, daysSinceCreated + 6),
+        });
+      }
+    } catch (err) {
+      console.warn("school_registrations query failed (might need migrations):", err);
+    }
+
     return json({ data: approvals });
   } catch (error: any) {
     return json({ error: error.message || "Internal Server Error" }, 500);
