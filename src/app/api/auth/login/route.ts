@@ -38,7 +38,7 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const profile = await getProfileForAuthUser(data.user.id);
+  const profile = await getProfileForAuthUser(data.user.id, data.user.user_metadata?.role);
   if (!profile) {
     await logAuthAttempt({ email, success: false, reason: "profile_not_found", ip, userAgent, userId: data.user.id });
     return json({ error: "User profile not found" }, 403);

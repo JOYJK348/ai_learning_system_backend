@@ -66,6 +66,38 @@ export async function getParentMe(req: NextRequest) {
   }
 }
 
+export async function updateParentProfile(req: NextRequest) {
+  const user = await requireParent(req);
+  if (!user) return json({ error: "Forbidden" }, 403);
+  try {
+    const { name, phone, profile_photo_url } = await req.json();
+    if (!name?.trim()) {
+      return json({ error: "Name is required" }, 400);
+    }
+
+    const supabaseAdmin = getSupabaseAdmin();
+    const { data, error } = await supabaseAdmin
+      .from("parents")
+      .update({
+        name: name.trim(),
+        phone: phone?.trim() || null,
+        profile_photo_url: profile_photo_url?.trim() || null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", user.profileId)
+      .is("deleted_at", null)
+      .select()
+      .maybeSingle();
+
+    if (error) throw error;
+    if (!data) return json({ error: "Parent not found" }, 404);
+
+    return json({ success: true, parent: data });
+  } catch (error) {
+    return json({ error: error instanceof Error ? error.message : "Unable to update profile" }, 500);
+  }
+}
+
 export async function listParentChildren(req: NextRequest) {
   const user = await requireParent(req);
   if (!user) return json({ error: "Forbidden" }, 403);

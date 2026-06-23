@@ -149,14 +149,106 @@ export async function blacklistToken(token: string) {
   });
 }
 
-export async function getProfileForAuthUser(authUserId: string): Promise<AuthUser | null> {
+export async function getProfileForAuthUser(authUserId: string, hintRole?: string): Promise<AuthUser | null> {
   const supabaseAdmin = getSupabaseAdmin();
-  const admin = await supabaseAdmin
-    .from("admins")
-    .select("id,email,name,role:lookup_user_roles(code)")
-    .eq("auth_user_id", authUserId)
-    .is("deleted_at", null)
-    .maybeSingle();
+
+  if (hintRole) {
+    if (hintRole === "super_admin") {
+      const admin = await supabaseAdmin
+        .from("admins")
+        .select("id,email,name,role:lookup_user_roles(code)")
+        .eq("auth_user_id", authUserId)
+        .is("deleted_at", null)
+        .maybeSingle();
+      if (admin.data) {
+        return {
+          id: authUserId,
+          email: admin.data.email,
+          role: "super_admin",
+          profileId: admin.data.id,
+          name: admin.data.name
+        };
+      }
+    } else if (hintRole === "school_admin") {
+      const schoolAdmin = await supabaseAdmin
+        .from("school_admins")
+        .select("id,email,name,school_id")
+        .eq("auth_user_id", authUserId)
+        .is("deleted_at", null)
+        .maybeSingle();
+      if (schoolAdmin.data) {
+        return {
+          id: authUserId,
+          email: schoolAdmin.data.email,
+          role: "school_admin",
+          profileId: schoolAdmin.data.id,
+          schoolId: schoolAdmin.data.school_id,
+          name: schoolAdmin.data.name
+        };
+      }
+    } else if (hintRole === "parent") {
+      const parent = await supabaseAdmin
+        .from("parents")
+        .select("id,email,name,school_id")
+        .eq("auth_user_id", authUserId)
+        .is("deleted_at", null)
+        .maybeSingle();
+      if (parent.data) {
+        return {
+          id: authUserId,
+          email: parent.data.email,
+          role: "parent",
+          profileId: parent.data.id,
+          schoolId: parent.data.school_id,
+          name: parent.data.name
+        };
+      }
+    } else if (hintRole === "student") {
+      const student = await supabaseAdmin
+        .from("students")
+        .select("id,full_name,email")
+        .eq("auth_user_id", authUserId)
+        .is("deleted_at", null)
+        .maybeSingle();
+      if (student.data) {
+        return {
+          id: authUserId,
+          email: student.data.email || null,
+          role: "student",
+          profileId: student.data.id,
+          name: student.data.full_name
+        };
+      }
+    }
+  }
+
+  // Fallback to parallel check if no hintRole or query didn't find the record
+  const [admin, schoolAdmin, parent, student] = await Promise.all([
+    supabaseAdmin
+      .from("admins")
+      .select("id,email,name,role:lookup_user_roles(code)")
+      .eq("auth_user_id", authUserId)
+      .is("deleted_at", null)
+      .maybeSingle(),
+    supabaseAdmin
+      .from("school_admins")
+      .select("id,email,name,school_id")
+      .eq("auth_user_id", authUserId)
+      .is("deleted_at", null)
+      .maybeSingle(),
+    supabaseAdmin
+      .from("parents")
+      .select("id,email,name,school_id")
+      .eq("auth_user_id", authUserId)
+      .is("deleted_at", null)
+      .maybeSingle(),
+    supabaseAdmin
+      .from("students")
+      .select("id,full_name,email")
+      .eq("auth_user_id", authUserId)
+      .is("deleted_at", null)
+      .maybeSingle()
+  ]);
 
   if (admin.data) {
     return {
@@ -167,14 +259,6 @@ export async function getProfileForAuthUser(authUserId: string): Promise<AuthUse
       name: admin.data.name
     };
   }
-
-  const schoolAdmin = await supabaseAdmin
-    .from("school_admins")
-    .select("id,email,name,school_id")
-    .eq("auth_user_id", authUserId)
-    .is("deleted_at", null)
-    .maybeSingle();
-
   if (schoolAdmin.data) {
     return {
       id: authUserId,
@@ -185,14 +269,6 @@ export async function getProfileForAuthUser(authUserId: string): Promise<AuthUse
       name: schoolAdmin.data.name
     };
   }
-
-  const parent = await supabaseAdmin
-    .from("parents")
-    .select("id,email,name,school_id")
-    .eq("auth_user_id", authUserId)
-    .is("deleted_at", null)
-    .maybeSingle();
-
   if (parent.data) {
     return {
       id: authUserId,
@@ -203,14 +279,6 @@ export async function getProfileForAuthUser(authUserId: string): Promise<AuthUse
       name: parent.data.name
     };
   }
-
-  const student = await supabaseAdmin
-    .from("students")
-    .select("id,full_name,email")
-    .eq("auth_user_id", authUserId)
-    .is("deleted_at", null)
-    .maybeSingle();
-
   if (student.data) {
     return {
       id: authUserId,
@@ -235,7 +303,8 @@ export async function getCurrentUser(req: NextRequest) {
   const { data, error } = await supabase.auth.getUser(token);
   if (error || !data.user) return null;
 
-  return getProfileForAuthUser(data.user.id);
+  const hintRole = data.user.user_metadata?.role;
+  return getProfileForAuthUser(data.user.id, hintRole);
 }
 
 export function requireRole(user: AuthUser | null, roles: UserRole[]) {
