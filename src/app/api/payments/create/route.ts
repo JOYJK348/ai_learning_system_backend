@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase-server';
 import { requireAuth } from '@/lib/auth-helpers';
 import { getRazorpay } from '@/lib/razorpay';
-import { getPlanById } from '@/config/plans';
+import { APIError, errorResponse } from '@/lib/api-error';
 
 /**
  * POST /api/payments/create
@@ -12,23 +12,21 @@ import { getPlanById } from '@/config/plans';
  * - Create a Razorpay order
  * - Record a "pending" entry in parent_payments (audit trail)
  * - Return order details to the frontend so it can open the Razorpay checkout
- *
- * Safety: Button must be disabled on the frontend after calling this endpoint
- * to prevent double-click duplicate orders.
  */
 export async function POST(req: NextRequest) {
+  let parentId: string | undefined = undefined;
   try {
     // ── Auth ────────────────────────────────────────────────────────────────
     const authResult = await requireAuth(req, ['parent']);
     if (authResult instanceof NextResponse) return authResult;
-    const { userId: parentId } = authResult;
+    parentId = authResult.userId;
 
     // ── Input Validation ────────────────────────────────────────────────────
     const body = await req.json();
     const { plan_id, interval_type = 'monthly' } = body;
 
     if (!plan_id) {
-      return NextResponse.json({ error: 'plan_id is required' }, { status: 400 });
+      throw new APIError('plan_id is required', 400, 'VALIDATION_ERROR');
     }
 
     // ── Resolve plan & amount ───────────────────────────────────────────────
@@ -41,11 +39,11 @@ export async function POST(req: NextRequest) {
       .maybeSingle();
 
     if (planError || !plan) {
-      return NextResponse.json({ error: 'Invalid or inactive plan' }, { status: 400 });
+      throw new APIError('Invalid or inactive plan', 400, 'PLAN_NOT_FOUND');
     }
 
     if (plan.code === 'free') {
-      return NextResponse.json({ error: 'Free plan does not require payment' }, { status: 400 });
+      throw new APIError('Free plan does not require payment', 400, 'INVALID_PAYMENT');
     }
 
     // Pick correct amount based on interval
@@ -66,7 +64,7 @@ export async function POST(req: NextRequest) {
       .maybeSingle();
 
     if (parentError || !parent) {
-      return NextResponse.json({ error: 'Parent profile not found' }, { status: 404 });
+      throw new APIError('Parent profile not found', 404, 'USER_NOT_FOUND');
     }
 
     // ── Create Razorpay Order ───────────────────────────────────────────────
@@ -98,8 +96,7 @@ export async function POST(req: NextRequest) {
       .single();
 
     if (paymentError) {
-      console.error('[payments/create] DB insert error:', paymentError);
-      return NextResponse.json({ error: 'Failed to record payment order' }, { status: 500 });
+      throw paymentError;
     }
 
     // ── Return to frontend ──────────────────────────────────────────────────
@@ -118,7 +115,6 @@ export async function POST(req: NextRequest) {
     });
 
   } catch (err: any) {
-    console.error('[payments/create] Unexpected error:', err);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    return errorResponse(err, { route: '/api/payments/create', method: 'POST', userId: parentId });
   }
 }

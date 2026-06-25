@@ -1,11 +1,22 @@
 import { NextRequest } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase-server";
 import { getCurrentUser, json, requireRole } from "@/lib/auth-helpers";
+import { sendWelcomeEmail } from "@/lib/email";
 
-function generatePassword(name: string): string {
-  const num = Math.floor(1000 + Math.random() * 9000);
-  const special = "@#!$*".split("")[Math.floor(Math.random() * 5)];
-  return name.charAt(0).toUpperCase() + name.slice(1, 4).toLowerCase() + special + num;
+function getParentPassword(phone: string | null): string {
+  const cleanPhone = String(phone || "").replace(/[^0-9]/g, "");
+  if (cleanPhone.length >= 6) {
+    return cleanPhone.slice(-6);
+  }
+  return String(Math.floor(100000 + Math.random() * 900000));
+}
+
+function getStudentPassword(phone: string | null): string {
+  const cleanPhone = String(phone || "").replace(/[^0-9]/g, "");
+  if (cleanPhone.length >= 6) {
+    return cleanPhone.slice(0, 6);
+  }
+  return String(Math.floor(100000 + Math.random() * 900000));
 }
 
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
@@ -49,8 +60,8 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     }
 
     // ── Approve: Create auth users + profiles ──
-    const parentPass = generatePassword(reg.parent_name);
-    const childPass = generatePassword(reg.child_name);
+    const parentPass = getParentPassword(reg.parent_phone);
+    const childPass = getStudentPassword(reg.parent_phone);
 
     const activeStatusId = (await supabaseAdmin.from("lookup_entity_status").select("id").eq("code", "active").single()).data?.id;
     const approvedApprovalId = (await supabaseAdmin.from("lookup_approval_status").select("id").eq("code", "approved").single()).data?.id;
@@ -69,7 +80,11 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     if (paErr || !parentAuth?.user) return json({ error: "Failed to create parent auth: " + paErr?.message }, 500);
 
     // Create child auth  
-    const childEmail = `stu_${reg.id.slice(0, 8)}@zhi.app`;
+    const cleanChildFirstName = reg.child_name.trim().split(" ")[0].toLowerCase().replace(/[^a-z0-9]/g, "");
+    const phoneDigits = String(reg.parent_phone || "").replace(/[^0-9]/g, "");
+    const lastFour = phoneDigits.length >= 4 ? phoneDigits.slice(-4) : Math.floor(1000 + Math.random() * 9000).toString();
+    const childEmail = `${cleanChildFirstName}.${lastFour}@zhi.app`;
+
     const { data: childAuth, error: caErr } = await supabaseAdmin.auth.admin.createUser({
       email: childEmail,
       password: childPass,
@@ -106,6 +121,8 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       auth_user_id: childAuth.user.id,
       full_name: reg.child_name,
       grade_id: reg.child_grade_id || null,
+      gender: reg.child_gender || null,
+      date_of_birth: reg.child_dob || null,
       status_id: activeStatusId,
     }).select("id").single();
 
@@ -168,6 +185,18 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       approved_by: user!.profileId,
       approved_at: new Date().toISOString(),
     }).eq("id", params.id);
+
+    // Send Welcome Email containing credentials via Resend
+    sendWelcomeEmail({
+      parentEmail: reg.parent_email,
+      parentName: reg.parent_name,
+      parentPass: parentPass,
+      childName: reg.child_name,
+      childEmail: childEmail,
+      childPass: childPass,
+    }).catch(err => {
+      console.error("Welcome email background send error:", err);
+    });
 
     return json({
       data: {

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase-server';
 import { requireAuth } from '@/lib/auth-helpers';
 import { verifyPaymentSignature } from '@/lib/razorpay';
+import { APIError, errorResponse } from '@/lib/api-error';
 
 /**
  * POST /api/payments/verify
@@ -13,26 +14,21 @@ import { verifyPaymentSignature } from '@/lib/razorpay';
  *   2. Idempotency check (prevents double-upgrade if called twice)
  *   3. DB transaction – atomically update parent_payments + parent_subscriptions + parents
  *   4. Return the new subscription details
- *
- * The webhook route (/api/payments/webhook) acts as the backup for cases where
- * the frontend call never arrives (tab closed, network drop, etc.).
  */
 export async function POST(req: NextRequest) {
+  let parentId: string | undefined = undefined;
   try {
     // ── Auth ────────────────────────────────────────────────────────────────
     const authResult = await requireAuth(req, ['parent']);
     if (authResult instanceof NextResponse) return authResult;
-    const { userId: parentId } = authResult;
+    parentId = authResult.userId;
 
     // ── Input ───────────────────────────────────────────────────────────────
     const body = await req.json();
     const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = body;
 
     if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
-      return NextResponse.json(
-        { error: 'razorpay_order_id, razorpay_payment_id and razorpay_signature are required' },
-        { status: 400 }
-      );
+      throw new APIError('razorpay_order_id, razorpay_payment_id and razorpay_signature are required', 400, 'VALIDATION_ERROR');
     }
 
     // ── 1. Verify Signature (Security Gate) ─────────────────────────────────
@@ -44,7 +40,7 @@ export async function POST(req: NextRequest) {
 
     if (!isValid) {
       console.warn('[payments/verify] Invalid signature for order:', razorpay_order_id);
-      return NextResponse.json({ error: 'Invalid payment signature' }, { status: 400 });
+      throw new APIError('Invalid payment signature', 400, 'SIGNATURE_INVALID');
     }
 
     const supabase = getSupabaseAdmin();
@@ -57,7 +53,7 @@ export async function POST(req: NextRequest) {
       .maybeSingle();
 
     if (fetchError || !payment) {
-      return NextResponse.json({ error: 'Payment order not found' }, { status: 404 });
+      throw new APIError('Payment order not found', 404, 'ORDER_NOT_FOUND');
     }
 
     // Already processed? Return success without DB changes (idempotency)
@@ -67,7 +63,7 @@ export async function POST(req: NextRequest) {
     }
 
     if (payment.status === 'failed') {
-      return NextResponse.json({ error: 'This payment was marked as failed' }, { status: 400 });
+      throw new APIError('This payment was marked as failed', 400, 'PAYMENT_FAILED');
     }
 
     // ── 3. Fetch parent record ───────────────────────────────────────────────
@@ -78,15 +74,10 @@ export async function POST(req: NextRequest) {
       .maybeSingle();
 
     if (parentFetchError || !parent) {
-      return NextResponse.json({ error: 'Parent not found' }, { status: 404 });
+      throw new APIError('Parent not found', 404, 'USER_NOT_FOUND');
     }
 
     // ── 4. Atomic DB Update (All-or-Nothing) ────────────────────────────────
-    // Supabase JS does not expose raw SQL transactions, so we execute
-    // updates in sequence. The payment row is updated first; if the
-    // subscription upsert fails we catch it and mark the payment back
-    // to pending so the webhook can retry.
-
     const now = new Date();
     const expiresAt = new Date(now);
     expiresAt.setDate(expiresAt.getDate() + 30); // 30-day subscription
@@ -105,8 +96,7 @@ export async function POST(req: NextRequest) {
       .eq('order_id', razorpay_order_id);
 
     if (paymentUpdateError) {
-      console.error('[payments/verify] Failed to update payment:', paymentUpdateError);
-      return NextResponse.json({ error: 'Failed to record payment' }, { status: 500 });
+      throw paymentUpdateError;
     }
 
     // 4b. Upsert subscription (create new or update existing)
@@ -135,10 +125,11 @@ export async function POST(req: NextRequest) {
         .single();
 
       if (subUpdateError) {
-        console.error('[payments/verify] Sub update error:', subUpdateError);
-      } else {
-        subscriptionId = updatedSub?.id || null;
+        // Rollback payment status to pending on subscription failure
+        await supabase.from('parent_payments').update({ status: 'pending' } as any).eq('order_id', razorpay_order_id);
+        throw subUpdateError;
       }
+      subscriptionId = updatedSub?.id || null;
     } else {
       // Create fresh subscription
       const { data: newSub, error: subInsertError } = await supabase
@@ -154,10 +145,11 @@ export async function POST(req: NextRequest) {
         .single();
 
       if (subInsertError) {
-        console.error('[payments/verify] Sub insert error:', subInsertError);
-      } else {
-        subscriptionId = newSub?.id || null;
+        // Rollback payment status to pending on subscription failure
+        await supabase.from('parent_payments').update({ status: 'pending' } as any).eq('order_id', razorpay_order_id);
+        throw subInsertError;
       }
+      subscriptionId = newSub?.id || null;
     }
 
     // 4c. Link subscription back to payment row
@@ -169,7 +161,7 @@ export async function POST(req: NextRequest) {
     }
 
     // 4d. Keep parents table in sync (backward compat)
-    await supabase
+    const { error: parentUpdateError } = await supabase
       .from('parents')
       .update({
         plan_type_id: payment.plan_id,
@@ -178,6 +170,10 @@ export async function POST(req: NextRequest) {
         plan_expires_at: expiresAt.toISOString(),
       })
       .eq('id', parent.id);
+
+    if (parentUpdateError) {
+      throw parentUpdateError;
+    }
 
     // 4e. Insert into payments table for admin dashboard & revenue metrics
     try {
@@ -219,7 +215,6 @@ export async function POST(req: NextRequest) {
     });
 
   } catch (err: any) {
-    console.error('[payments/verify] Unexpected error:', err);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    return errorResponse(err, { route: '/api/payments/verify', method: 'POST', userId: parentId });
   }
 }

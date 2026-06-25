@@ -2,10 +2,12 @@ import { NextRequest } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase-server";
 import { getCurrentUser, json, requireRole } from "@/lib/auth-helpers";
 
-function generatePassword(name: string): string {
-  const num = Math.floor(1000 + Math.random() * 9000);
-  const special = "@#!$*".split("")[Math.floor(Math.random() * 5)];
-  return name.charAt(0).toUpperCase() + name.slice(1, 4).toLowerCase() + special + num;
+function getPasswordFromPhone(phone: string | null): string {
+  const cleanPhone = String(phone || "").replace(/[^0-9]/g, "");
+  if (cleanPhone.length >= 6) {
+    return cleanPhone.slice(-6);
+  }
+  return String(Math.floor(100000 + Math.random() * 900000));
 }
 
 function generateSchoolCode(name: string): string {
@@ -55,7 +57,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     }
 
     // ── Approve: Create School + Admin Auth + Admin Profile ──
-    const adminPass = generatePassword(reg.admin_name);
+    const adminPass = getPasswordFromPhone(reg.admin_phone);
     const schoolCode = generateSchoolCode(reg.school_name);
 
     // Lookups
