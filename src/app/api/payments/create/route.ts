@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase-server';
 import { requireAuth } from '@/lib/auth-helpers';
-import { razorpay } from '@/lib/razorpay';
+import { getRazorpay } from '@/lib/razorpay';
 import { getPlanById } from '@/config/plans';
 
 /**
@@ -70,7 +70,7 @@ export async function POST(req: NextRequest) {
     }
 
     // ── Create Razorpay Order ───────────────────────────────────────────────
-    const razorpayOrder = await razorpay.orders.create({
+    const razorpayOrder = await getRazorpay().orders.create({
       amount: amountInPaise,
       currency: 'INR',
       receipt: `zhi_${parent.id.slice(0, 8)}_${Date.now()}`,

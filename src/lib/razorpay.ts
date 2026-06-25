@@ -1,20 +1,22 @@
 import Razorpay from 'razorpay';
 import crypto from 'crypto';
 
-// ── Razorpay SDK singleton ──────────────────────────────────────────────────
-// Initialised once and reused across all API routes.
-// Throws at startup if env vars are missing so we catch config errors early.
+let razorpayInstance: Razorpay | null = null;
 
-if (!process.env.RAZORPAY_KEY_ID || !process.env.RAZORPAY_KEY_SECRET) {
-  throw new Error(
-    '[razorpay] RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET must be set in .env'
-  );
+export function getRazorpay(): Razorpay {
+  if (!razorpayInstance) {
+    if (!process.env.RAZORPAY_KEY_ID || !process.env.RAZORPAY_KEY_SECRET) {
+      throw new Error(
+        '[razorpay] RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET must be set in .env'
+      );
+    }
+    razorpayInstance = new Razorpay({
+      key_id: process.env.RAZORPAY_KEY_ID,
+      key_secret: process.env.RAZORPAY_KEY_SECRET,
+    });
+  }
+  return razorpayInstance;
 }
-
-export const razorpay = new Razorpay({
-  key_id: process.env.RAZORPAY_KEY_ID,
-  key_secret: process.env.RAZORPAY_KEY_SECRET,
-});
 
 // ── Signature Verification ──────────────────────────────────────────────────
 /**
