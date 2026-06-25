@@ -44,6 +44,80 @@ export async function POST(req: NextRequest) {
   }
 
   const supabaseAdmin = getSupabaseAdmin();
+
+  // Check if email already registered or pending anywhere in the system
+  const cleanEmail = email.trim().toLowerCase();
+
+  // 1. Check parent_registrations
+  const { data: parentReg } = await supabaseAdmin
+    .from("parent_registrations")
+    .select("id, status")
+    .eq("parent_email", cleanEmail)
+    .is("deleted_at", null)
+    .maybeSingle();
+  if (parentReg) {
+    return json({ 
+      error: parentReg.status === "pending"
+        ? "A parent registration with this email is already pending approval."
+        : "This email is already registered. Please login."
+    }, 409);
+  }
+
+  // 2. Check school_registrations
+  const { data: schoolReg } = await supabaseAdmin
+    .from("school_registrations")
+    .select("id, status")
+    .eq("admin_email", cleanEmail)
+    .is("deleted_at", null)
+    .maybeSingle();
+  if (schoolReg) {
+    return json({ 
+      error: schoolReg.status === "pending"
+        ? "A school registration with this email is already pending approval."
+        : "This email is already registered as a school admin. Please login."
+    }, 409);
+  }
+
+  // 3. Check parents table
+  const { data: parentRecord } = await supabaseAdmin
+    .from("parents")
+    .select("id")
+    .eq("email", cleanEmail)
+    .is("deleted_at", null)
+    .maybeSingle();
+  if (parentRecord) {
+    return json({ error: "This email is already registered. Please login." }, 409);
+  }
+
+  // 4. Check school_admins table
+  const { data: schoolAdminRecord } = await supabaseAdmin
+    .from("school_admins")
+    .select("id")
+    .eq("email", cleanEmail)
+    .is("deleted_at", null)
+    .maybeSingle();
+  if (schoolAdminRecord) {
+    return json({ error: "This email is already registered as a school admin. Please login." }, 409);
+  }
+
+  // 5. Check admins table
+  const { data: adminRecord } = await supabaseAdmin
+    .from("admins")
+    .select("id")
+    .eq("email", cleanEmail)
+    .is("deleted_at", null)
+    .maybeSingle();
+  if (adminRecord) {
+    return json({ error: "This email is already registered. Please login." }, 409);
+  }
+
+  // 6. Check Auth users
+  const { data: existingAuth } = await supabaseAdmin.auth.admin.listUsers();
+  const authExists = existingAuth?.users?.some((u: any) => u.email === cleanEmail);
+  if (authExists) {
+    return json({ error: "This email is already registered. Please login." }, 409);
+  }
+
   let activeStatusId: number;
   let roleId: number;
 

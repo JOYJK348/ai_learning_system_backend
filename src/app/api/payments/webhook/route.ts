@@ -169,6 +169,33 @@ export async function POST(req: NextRequest) {
     })
     .eq('id', existingPayment.parent_id);
 
+  // 5e. Insert into payments table for admin dashboard & revenue metrics
+  try {
+    const { data: planInfo } = await supabase
+      .from('plans')
+      .select('name')
+      .eq('id', existingPayment.plan_id)
+      .maybeSingle();
+
+    await supabase
+      .from('payments')
+      .insert({
+        parent_id: existingPayment.parent_id,
+        plan_type_id: 2, // 2 = paid (parent subscription)
+        plan_name_snapshot: planInfo?.name || 'Parent Plan',
+        plan_price_snapshot: existingPayment.amount,
+        amount: existingPayment.amount,
+        payment_status_id: 2, // 2 = success
+        gateway_name: 'razorpay',
+        gateway_order_id: razorpayOrderId,
+        gateway_payment_id: razorpayPaymentId,
+        paid_at: now.toISOString(),
+        expires_at: expiresAt.toISOString(),
+      });
+  } catch (insertErr) {
+    console.error('[payments/webhook] Failed to insert into payments table:', insertErr);
+  }
+
   console.log(
     `[payments/webhook] ✅ Webhook processed | parent=${existingPayment.parent_id} | plan=${existingPayment.plan_id} | order=${razorpayOrderId}`
   );
