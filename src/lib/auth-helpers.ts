@@ -330,3 +330,22 @@ export async function requireSchoolAdmin(req: NextRequest) {
   if (expired) return { user: currentUser, planExpired: true };
   return { user: currentUser };
 }
+
+/**
+ * Combined auth guard used by payment routes.
+ * Returns { userId, user: AuthUser } on success,
+ * or a 401/403 NextResponse on failure.
+ */
+export async function requireAuth(
+  req: NextRequest,
+  roles: UserRole[]
+): Promise<{ userId: string; user: AuthUser } | NextResponse> {
+  const currentUser = await getCurrentUser(req);
+  if (!currentUser) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+  if (!requireRole(currentUser, roles)) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
+  return { userId: currentUser.id, user: currentUser };
+}

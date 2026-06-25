@@ -131,7 +131,6 @@ export async function GET(req: NextRequest) {
       }
     });
 
-    // Enrich students, filter to only individual (non-school) students
     const data = students
       .map((student) => {
         const schoolInfo = schoolStudentMap[student.id];
@@ -168,8 +167,7 @@ export async function GET(req: NextRequest) {
           last_active: student.last_activity_at,
           created_at: student.created_at,
         };
-      })
-      .filter((s) => !s.school_id);
+      });
 
     return json({ data });
   } catch (error) {

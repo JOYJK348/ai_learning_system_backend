@@ -30,8 +30,8 @@ export async function GET(
     // Fetch payment history and children in parallel
     const [paymentsRes, linksRes, planTypesRes, planStatusRes, approvalStatusRes] = await Promise.all([
       supabaseAdmin
-        .from("payments")
-        .select("id,amount,currency,payment_status_id,plan_name_snapshot,gateway_name,notes,paid_at,created_at")
+        .from("parent_payments")
+        .select("id,amount,currency,status,payment_id,confirmed_at,created_at,plan:plans(name)")
         .eq("parent_id", params.id)
         .order("created_at", { ascending: false })
         .limit(20),
@@ -54,23 +54,23 @@ export async function GET(
     (approvalStatusRes.data || []).forEach(aps => { approvalStatusMap[aps.id] = aps.name; });
 
     // Payment status lookup
-    const paymentStatusMap: Record<number, { name: string; color: string }> = {
-      1: { name: "Pending", color: "#F59E0B" },
-      2: { name: "Success", color: "#22C55E" },
-      3: { name: "Failed", color: "#EF4444" },
-      4: { name: "Refunded", color: "#6B7280" },
+    const paymentStatusMap: Record<string, { name: string; color: string }> = {
+      pending: { name: "pending", color: "#F59E0B" },
+      success: { name: "success", color: "#22C55E" },
+      failed: { name: "failed", color: "#EF4444" },
+      refunded: { name: "refunded", color: "#6B7280" },
     };
 
     const payments = (paymentsRes.data || []).map((pay: any) => ({
       id: pay.id,
       amount: pay.amount,
       currency: pay.currency || "INR",
-      plan: pay.plan_name_snapshot || "—",
-      gateway: pay.gateway_name || "manual",
-      notes: pay.notes || null,
-      status: pay.payment_status_id ? paymentStatusMap[pay.payment_status_id]?.name ?? "Unknown" : "Unknown",
-      status_color: pay.payment_status_id ? paymentStatusMap[pay.payment_status_id]?.color ?? "#6B7280" : "#6B7280",
-      paid_at: pay.paid_at,
+      plan: pay.plan?.name || "—",
+      gateway: pay.payment_id ? "Razorpay" : "manual",
+      notes: null,
+      status: pay.status || "pending",
+      status_color: paymentStatusMap[pay.status]?.color ?? "#6B7280",
+      paid_at: pay.confirmed_at || pay.created_at,
       created_at: pay.created_at,
     }));
 
@@ -132,7 +132,7 @@ export async function GET(
         approval_status_name: parent.approval_status_id ? approvalStatusMap[parent.approval_status_id] : "Approved",
         payments,
         children,
-        total_paid: payments.filter(p => p.status === "Success").reduce((sum, p) => sum + (parseFloat(String(p.amount)) || 0), 0),
+        total_paid: payments.filter(p => p.status === "success").reduce((sum, p) => sum + (parseFloat(String(p.amount)) || 0), 0),
       },
     });
   } catch (error) {

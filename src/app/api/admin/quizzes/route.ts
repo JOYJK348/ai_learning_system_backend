@@ -10,9 +10,37 @@ export async function GET(req: NextRequest) {
     const supabase = getSupabaseAdmin();
     const { data, error } = await supabase
       .from('quiz_questions')
-      .select(
-        `id,question_text,explanation,points,status_id,created_at,updated_at,quiz:quizzes(id,lesson_id,title),quiz_options(id,option_text,is_correct,sort_order)`
-      )
+      .select(`
+        id,
+        question_text,
+        explanation,
+        points,
+        status_id,
+        created_at,
+        updated_at,
+        quiz:quizzes(
+          id,
+          lesson_id,
+          title,
+          lesson:lessons(
+            id,
+            title,
+            chapter:chapters(
+              id,
+              name,
+              subject:subjects(
+                id,
+                name,
+                grade:grades(
+                  id,
+                  name
+                )
+              )
+            )
+          )
+        ),
+        quiz_options(id,option_text,is_correct,sort_order)
+      `)
       .is('deleted_at', null)
       .order('created_at', { ascending: false });
 
@@ -29,7 +57,10 @@ export async function GET(req: NextRequest) {
         option_d: opts[3]?.option_text || '',
         correct_answer: (opts.find((o:any)=>o.is_correct) ? (['A','B','C','D'][opts.indexOf(opts.find((o:any)=>o.is_correct))]||'A') : 'A'),
         lesson_id: q.quiz?.lesson_id || null,
-        lesson_title: q.quiz?.title || null,
+        lesson_title: q.quiz?.lesson?.title || q.quiz?.title || null,
+        grade_name: q.quiz?.lesson?.chapter?.subject?.grade?.name || null,
+        subject_name: q.quiz?.lesson?.chapter?.subject?.name || null,
+        chapter_id: q.quiz?.lesson?.chapter?.id || null,
         status_id: q.status_id,
         difficulty: 'easy',
         time_limit_seconds: null,

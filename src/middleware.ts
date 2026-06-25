@@ -46,7 +46,12 @@ export async function middleware(req: NextRequest) {
     return withCors(req, NextResponse.next());
   }
 
-  const token = req.cookies.get(ACCESS_COOKIE)?.value;
+  // Accept token from cookie OR Authorization Bearer header (frontend uses sessionStorage → Bearer)
+  const cookieToken = req.cookies.get(ACCESS_COOKIE)?.value;
+  const authHeader = req.headers.get("Authorization");
+  const bearerToken = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null;
+  const token = cookieToken || bearerToken;
+
   if (!token) return withCors(req, NextResponse.json({ error: "Unauthorized" }, { status: 401 }));
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
