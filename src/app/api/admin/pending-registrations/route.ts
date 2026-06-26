@@ -38,6 +38,24 @@ export async function GET(req: NextRequest) {
 
     if (schoolError) return json({ error: schoolError.message }, 500);
 
+    // Fetch child linking requests
+    let linkReqsQuery = supabaseAdmin
+      .from("child_link_requests")
+      .select(`
+        id, child_name, child_gender, child_dob, status, rejection_reason, created_at,
+        parents!parent_id(name, email, phone),
+        grades!child_grade_id(name)
+      `)
+      .is("deleted_at", null)
+      .order("created_at", { ascending: false });
+
+    if (status) {
+      linkReqsQuery = linkReqsQuery.eq("status", status);
+    }
+
+    const { data: childLinkReqs, error: childLinkError } = await linkReqsQuery;
+    if (childLinkError) return json({ error: childLinkError.message }, 500);
+
     const formattedParents = (parentRegs || []).map((r: any) => ({
       id: r.id,
       parent_name: r.parent_name,
@@ -49,7 +67,8 @@ export async function GET(req: NextRequest) {
       status: r.status,
       rejection_reason: r.rejection_reason,
       created_at: r.created_at,
-      is_school: false
+      is_school: false,
+      is_link_request: false
     }));
 
     const formattedSchools = (schoolRegs || []).map((r: any) => ({
@@ -64,10 +83,26 @@ export async function GET(req: NextRequest) {
       status: r.status,
       rejection_reason: r.rejection_reason,
       created_at: r.created_at,
-      is_school: true
+      is_school: true,
+      is_link_request: false
     }));
 
-    const merged = [...formattedParents, ...formattedSchools].sort(
+    const formattedLinkRequests = (childLinkReqs || []).map((r: any) => ({
+      id: r.id,
+      parent_name: r.parents?.name || "Parent",
+      parent_email: r.parents?.email || "",
+      parent_phone: r.parents?.phone || "",
+      child_name: r.child_name,
+      grade: r.grades?.name || null,
+      school: null,
+      status: r.status,
+      rejection_reason: r.rejection_reason,
+      created_at: r.created_at,
+      is_school: false,
+      is_link_request: true
+    }));
+
+    const merged = [...formattedParents, ...formattedSchools, ...formattedLinkRequests].sort(
       (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
     );
 
@@ -76,3 +111,4 @@ export async function GET(req: NextRequest) {
     return json({ error: err instanceof Error ? err.message : "Failed to load" }, 500);
   }
 }
+

@@ -1,19 +1,20 @@
 import { NextRequest } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase-server";
 import { getCurrentUser, json, requireRole } from "@/lib/auth-helpers";
+import { sendSchoolWelcomeEmail } from "@/lib/email";
 
-function getPasswordFromPhone(phone: string | null): string {
-  const cleanPhone = String(phone || "").replace(/[^0-9]/g, "");
-  if (cleanPhone.length >= 6) {
-    return cleanPhone.slice(-6);
-  }
-  return String(Math.floor(100000 + Math.random() * 900000));
+function generateSchoolPassword(schoolName: string): string {
+  const clean = schoolName.replace(/[^a-zA-Z]/g, "");
+  const prefix = clean.slice(0, 4);
+  const capitalized = prefix.charAt(0).toUpperCase() + prefix.slice(1).toLowerCase();
+  return `Zhi@${capitalized}2026`;
 }
 
-function generateSchoolCode(name: string): string {
-  const clean = name.toLowerCase().replace(/[^a-z0-9]/g, "");
+function generateSchoolCode(schoolName: string): string {
+  const clean = schoolName.replace(/[^a-zA-Z]/g, "").toUpperCase();
+  const prefix = clean.slice(0, 4).padEnd(4, "X");
   const rand = Math.floor(100 + Math.random() * 900);
-  return `${clean.slice(0, 8)}${rand}`;
+  return `ZHI-${prefix}-${rand}`;
 }
 
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
@@ -57,8 +58,10 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     }
 
     // ── Approve: Create School + Admin Auth + Admin Profile ──
-    const adminPass = getPasswordFromPhone(reg.admin_phone);
+    const adminPass = generateSchoolPassword(reg.school_name);
     const schoolCode = generateSchoolCode(reg.school_name);
+    const cleanSchoolPrefix = schoolCode.replace(/[^a-zA-Z0-9]/g, "").toLowerCase();
+    const adminEmail = `admin.${cleanSchoolPrefix}@zhi.app`;
 
     // Lookups
     const activeStatusId = (await supabaseAdmin.from("lookup_entity_status").select("id").eq("code", "active").single()).data?.id;
@@ -94,9 +97,9 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       return json({ error: "Failed to create school record: " + schoolErr?.message }, 500);
     }
 
-    // 2. Create school admin auth user
+    // 2. Create school admin auth user (using school-based admin username)
     const { data: adminAuth, error: authErr } = await supabaseAdmin.auth.admin.createUser({
-      email: reg.admin_email,
+      email: adminEmail,
       password: adminPass,
       email_confirm: true,
       user_metadata: { role: "school_admin", name: reg.admin_name },
@@ -108,7 +111,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       return json({ error: "Failed to create school admin auth: " + authErr?.message }, 500);
     }
 
-    // 3. Create school admin profile record
+    // 3. Create school admin profile record (storing personal email for registry records)
     const { error: profileErr } = await supabaseAdmin
       .from("school_admins")
       .insert({
@@ -138,12 +141,24 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       })
       .eq("id", params.id);
 
+    // 5. Send School Welcome Email via Resend
+    sendSchoolWelcomeEmail({
+      adminEmail: reg.admin_email,
+      adminName: reg.admin_name,
+      adminUsername: adminEmail,
+      adminPass: adminPass,
+      schoolName: reg.school_name,
+      schoolCode: schoolCode,
+    }).catch(err => {
+      console.error("School welcome email background send error:", err);
+    });
+
     return json({
       data: {
         status: "approved",
         school_code: schoolCode,
         admin_credentials: {
-          email: reg.admin_email,
+          email: adminEmail,
           password: adminPass,
         }
       }
