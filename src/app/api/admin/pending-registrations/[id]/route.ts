@@ -96,11 +96,13 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       return json({ error: "Failed to create student auth: " + caErr?.message }, 500);
     }
 
+    const sanitizedPhone = reg.parent_phone ? String(reg.parent_phone).replace(/[^0-9]/g, "") : null;
+
     // Insert parent profile
     const { data: parentRec, error: ppErr } = await supabaseAdmin.from("parents").insert({
       auth_user_id: parentAuth.user.id,
       email: reg.parent_email,
-      phone: reg.parent_phone || null,
+      phone: sanitizedPhone,
       name: reg.parent_name,
       registration_type: reg.school_id ? "school" : "individual",
       school_id: reg.school_id || null,

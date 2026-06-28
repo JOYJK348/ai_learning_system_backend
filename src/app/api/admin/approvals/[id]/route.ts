@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase-server";
 import { getCurrentUser, json, requireRole } from "@/lib/auth-helpers";
+import { sendParentRejectionEmail } from "@/lib/email";
 
 export async function PUT(
   req: NextRequest,
@@ -39,6 +40,17 @@ export async function PUT(
       updateData.rejection_reason = reason || null;
     }
 
+    // Fetch parent registration details for rejection email
+    let parentRegDetails: { parent_email?: string; parent_name?: string; child_name?: string } | null = null;
+    if (status === "rejected") {
+      const { data: regRow } = await supabase
+        .from("parent_registrations")
+        .select("parent_email, parent_name, child_name")
+        .eq("id", params.id)
+        .maybeSingle();
+      parentRegDetails = regRow || null;
+    }
+
     const { data, error } = await supabase
       .from("parents")
       .update(updateData)
@@ -65,6 +77,16 @@ export async function PUT(
       entity_id: params.id,
       details: { status, reason },
     });
+
+    // Send rejection email if rejected
+    if (status === "rejected" && parentRegDetails?.parent_email) {
+      sendParentRejectionEmail({
+        parentEmail: parentRegDetails.parent_email,
+        parentName: parentRegDetails.parent_name || "Parent",
+        childName: parentRegDetails.child_name || "your child",
+        reason: reason || undefined,
+      }).catch(err => console.error("Parent rejection email error:", err));
+    }
 
     return json({ data, message: `Parent ${status}` });
   } catch (error: any) {

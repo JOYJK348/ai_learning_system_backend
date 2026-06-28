@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { getCurrentUser, json, requireRole, requireSchoolAdmin } from "./auth-helpers";
 import { getSupabaseAdmin } from "./supabase-server";
+import { sendWelcomeEmail, sendChildLinkedEmail } from "./email";
 
 type SchoolPayload = Record<string, unknown>;
 
@@ -265,7 +266,7 @@ export async function getSchoolAdminMe(req: NextRequest) {
 
   const { data, error } = await getSupabaseAdmin()
     .from("schools")
-    .select("id,name,code,city,state,email,phone,plan_status_id,max_students,status_id,logo_url")
+    .select("id,name,code,city,state,email,phone,plan_status_id,max_students,status_id,logo_url,address,pincode,website,principal_name,principal_phone")
     .eq("id", user.schoolId)
     .is("deleted_at", null)
     .maybeSingle();
@@ -328,13 +329,27 @@ export async function getSchoolAdminDashboard(req: NextRequest) {
   const studentCount = schoolStudents?.length || 0;
   const studentsByGrade: Record<string, number> = {};
   const studentsBySection: Record<string, number> = {};
+  const gradeIds = new Set<string>();
 
   (schoolStudents || []).forEach((row) => {
     const gradeId = studentById[row.student_id] || "unknown";
     const section = String(row.section || "Unknown");
     studentsByGrade[gradeId] = (studentsByGrade[gradeId] || 0) + 1;
     studentsBySection[section] = (studentsBySection[section] || 0) + 1;
+    if (gradeId !== "unknown") gradeIds.add(gradeId);
   });
+
+  // Fetch grade names so frontend can show proper labels
+  const gradeNames: Record<string, string> = {};
+  if (gradeIds.size > 0) {
+    const { data: gradeRows } = await supabaseAdmin
+      .from("grades")
+      .select("id,name")
+      .in("id", Array.from(gradeIds));
+    (gradeRows || []).forEach((g: { id: string; name: string }) => {
+      gradeNames[g.id] = g.name;
+    });
+  }
   const today = new Date().toISOString().slice(0, 10);
   const { data: termRows, error: termError } = await supabaseAdmin
     .from("term_unlocks")
@@ -360,9 +375,11 @@ export async function getSchoolAdminDashboard(req: NextRequest) {
       code: school.code,
       city: school.city,
       total_students: studentCount,
+      total_grades: gradeIds.size,
       max_students: school.max_students,
       plan_status: planStatus?.code || null
     },
+    grade_names: gradeNames,
     students_by_grade: studentsByGrade,
     students_by_section: studentsBySection,
     term_stats: {
@@ -390,7 +407,7 @@ export async function listSchoolStudents(req: NextRequest) {
     .from("school_students")
     .select(
       `id,student_id,roll_number,section,admission_date,status_id,created_at,updated_at,
-       students!inner(full_name,grade_id,total_stars_earned,overall_progress,last_activity_at,grades!inner(name))`
+       students!inner(full_name,grade_id,total_stars_earned,overall_progress,last_activity_at,grades(name))`
     )
     .eq("school_id", user.schoolId)
     .is("deleted_at", null)
@@ -432,24 +449,45 @@ export async function createSchoolStudent(req: NextRequest) {
 
   const body = await req.json().catch(() => ({}));
   const fullName = String(body.full_name || "").trim();
-  const email = String(body.email || "").trim();
-  const mobile = String(body.mobile || "").trim();
-
-  if (!fullName) return json({ error: "full_name is required" }, 400);
-  if (!email) return json({ error: "email is required" }, 400);
-  if (!mobile || mobile.length < 6) return json({ error: "valid mobile is required" }, 400);
-
-  const password = mobile.slice(-6);
+  const parentName = String(body.parent_name || "Parent").trim();
+  const parentEmail = String(body.parent_email || "").trim().toLowerCase();
+  const parentPhone = String(body.parent_phone || "").trim();
   const gradeId = String(body.grade_id || "").trim();
   const section = String(body.section || "").trim();
   const rollNumber = String(body.roll_number || "").trim();
 
+  if (!fullName) return json({ error: "full_name is required" }, 400);
+  if (!gradeId) return json({ error: "grade_id is required" }, 400);
+  if (!parentEmail) return json({ error: "parent_email is required" }, 400);
+  if (!parentPhone || parentPhone.length < 6) return json({ error: "valid parent_phone (minimum 6 digits) is required" }, 400);
+
   const supabaseAdmin = getSupabaseAdmin();
 
-  // 1. Create Supabase Auth user
+  // Check unique roll number if provided
+  if (rollNumber) {
+    const { count } = await supabaseAdmin
+      .from("school_students")
+      .select("*", { count: "exact", head: true })
+      .eq("school_id", user.schoolId)
+      .eq("roll_number", rollNumber)
+      .is("deleted_at", null);
+    if (count && count > 0) {
+      return json({ error: `Roll number "${rollNumber}" already exists in this school` }, 400);
+    }
+  }
+
+  // Generate student credentials
+  const cleanChildFirstName = fullName.split(" ")[0].toLowerCase().replace(/[^a-z0-9]/g, "");
+  const randSuffix = Math.floor(1000 + Math.random() * 9000).toString();
+  const studentEmail = `${cleanChildFirstName}.${randSuffix}@zhi.app`;
+
+  const cleanPhone = parentPhone.replace(/[^0-9]/g, "");
+  const studentPassword = cleanPhone.length >= 6 ? cleanPhone.slice(0, 6) : String(Math.floor(100000 + Math.random() * 900000));
+
+  // 1. Create Supabase Auth student
   const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
-    email,
-    password,
+    email: studentEmail,
+    password: studentPassword,
     email_confirm: true,
     user_metadata: { role: "student", name: fullName }
   });
@@ -463,8 +501,8 @@ export async function createSchoolStudent(req: NextRequest) {
     .insert({
       auth_user_id: authData.user.id,
       full_name: fullName,
-      email,
-      mobile,
+      email: studentEmail,
+      mobile: parentPhone,
       grade_id: gradeId || null,
       status_id: activeStatusId
     })
@@ -498,16 +536,119 @@ export async function createSchoolStudent(req: NextRequest) {
     return json({ error: linkError.message }, 400);
   }
 
+  // 4. Handle Parent Account Creation / Linking
+  let parentStatus: 'created' | 'linked' = 'created';
+  let parentPassword = '';
+
+  // Check if parent profile exists
+  const { data: existingParent } = await supabaseAdmin
+    .from("parents")
+    .select("id, name")
+    .eq("email", parentEmail)
+    .maybeSingle();
+
+  if (existingParent) {
+    // Link child to existing parent
+    const { error: lnkParentErr } = await supabaseAdmin.from("parent_student_links").insert({
+      parent_id: existingParent.id,
+      student_id: student.id,
+      is_primary: true,
+    });
+
+    if (!lnkParentErr) {
+      parentStatus = 'linked';
+      await sendChildLinkedEmail({
+        parentEmail,
+        parentName: existingParent.name || parentName,
+        childName: fullName,
+        childEmail: studentEmail,
+        childPass: studentPassword
+      });
+    } else {
+      console.error("Failed linking parent:", lnkParentErr.message);
+    }
+  } else {
+    // Create new parent account
+    parentPassword = cleanPhone.length >= 6 ? cleanPhone.slice(-6) : String(Math.floor(100000 + Math.random() * 900000));
+    
+    let parentAuthId = "";
+    const { data: parentAuth, error: paErr } = await supabaseAdmin.auth.admin.createUser({
+      email: parentEmail,
+      password: parentPassword,
+      email_confirm: true,
+      user_metadata: { role: "parent", name: parentName },
+    });
+
+    if (paErr) {
+      // Find existing auth user in Supabase
+      const { data: usersData } = await supabaseAdmin.auth.admin.listUsers();
+      const existingAuthUser = usersData?.users.find(u => u.email?.toLowerCase() === parentEmail);
+      if (existingAuthUser) {
+        parentAuthId = existingAuthUser.id;
+      } else {
+        console.error("Failed creating parent auth:", paErr.message);
+      }
+    } else if (parentAuth?.user) {
+      parentAuthId = parentAuth.user.id;
+    }
+
+    if (parentAuthId) {
+      // Get lookup entities
+      const { data: approvedApproval } = await supabaseAdmin.from("lookup_approval_status").select("id").eq("code", "approved").maybeSingle();
+      const { data: freePlan } = await supabaseAdmin.from("lookup_plan_types").select("id").eq("code", "free").maybeSingle();
+      const { data: activePlan } = await supabaseAdmin.from("lookup_plan_status").select("id").eq("code", "active").maybeSingle();
+
+      const { data: parentRec, error: ppErr } = await supabaseAdmin.from("parents").insert({
+        auth_user_id: parentAuthId,
+        email: parentEmail,
+        phone: cleanPhone,
+        name: parentName,
+        registration_type: "school",
+        school_id: user.schoolId,
+        plan_type_id: freePlan?.id || 1,
+        plan_status_id: activePlan?.id || 1,
+        approval_status_id: approvedApproval?.id || 2,
+        status_id: activeStatusId || 1,
+      }).select("id").single();
+
+      if (!ppErr && parentRec) {
+        await supabaseAdmin.from("parent_student_links").insert({
+          parent_id: parentRec.id,
+          student_id: student.id,
+          is_primary: true,
+        });
+
+        await sendWelcomeEmail({
+          parentEmail,
+          parentName,
+          parentPass: parentPassword,
+          childName: fullName,
+          childEmail: studentEmail,
+          childPass: studentPassword
+        });
+      } else {
+        console.error("Failed creating parent profile:", ppErr?.message);
+        // clean up auth on failure if created fresh
+        if (!paErr && parentAuth?.user) {
+          await supabaseAdmin.auth.admin.deleteUser(parentAuth.user.id);
+        }
+      }
+    }
+  }
+
   return json({
     data: {
       id: student.id,
       full_name: student.full_name,
-      email: student.email,
+      email: studentEmail,
       grade_id: gradeId,
       section,
       roll_number: rollNumber,
-      username: email,
-      password
+      username: studentEmail,
+      password: studentPassword,
+      parent_email: parentEmail,
+      parent_status: parentStatus,
+      parent_password: parentStatus === 'created' ? parentPassword : ''
     }
   }, 201);
 }

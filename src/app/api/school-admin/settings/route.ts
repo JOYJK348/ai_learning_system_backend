@@ -18,6 +18,10 @@ export async function PUT(req: NextRequest) {
     if (body.address !== undefined) updates.address = body.address;
     if (body.city !== undefined) updates.city = body.city;
     if (body.state !== undefined) updates.state = body.state;
+    if (body.pincode !== undefined) updates.pincode = body.pincode;
+    if (body.website !== undefined) updates.website = body.website;
+    if (body.principal_name !== undefined) updates.principal_name = body.principal_name;
+    if (body.principal_phone !== undefined) updates.principal_phone = body.principal_phone;
     if (body.logo_url !== undefined) updates.logo_url = body.logo_url;
 
     const { data, error } = await supabase
@@ -25,7 +29,7 @@ export async function PUT(req: NextRequest) {
       .update(updates)
       .eq("id", user.schoolId)
       .is("deleted_at", null)
-      .select("id,name,code,logo_url,city,state,email,phone")
+      .select("id,name,code,logo_url,city,state,email,phone,pincode,website,principal_name,principal_phone")
       .maybeSingle();
 
     if (error) return json({ error: error.message }, 400);

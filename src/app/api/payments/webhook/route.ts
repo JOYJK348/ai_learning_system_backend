@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase-server';
 import { verifyWebhookSignature } from '@/lib/razorpay';
+import { getPlanByTypeId, calculateNewExpiry } from '@/config/plans';
 
 /**
  * POST /api/payments/webhook
@@ -63,6 +64,7 @@ export async function POST(req: NextRequest) {
   }
 
   const supabase = getSupabaseAdmin();
+  const now = new Date();
 
   // ── 4. Idempotency check ─────────────────────────────────────────────────
   const { data: existingPayment, error: fetchError } = await supabase
@@ -77,6 +79,69 @@ export async function POST(req: NextRequest) {
   }
 
   if (!existingPayment) {
+    // Let's check if it's a school payment!
+    const { data: schoolPayment, error: schoolPayError } = await supabase
+      .from('payments')
+      .select('*')
+      .eq('gateway_order_id', razorpayOrderId)
+      .maybeSingle();
+
+    if (schoolPayError) {
+      console.error('[payments/webhook] DB fetch error for school payment:', schoolPayError);
+      return NextResponse.json({ error: 'DB error' }, { status: 500 });
+    }
+
+    if (schoolPayment) {
+      if (schoolPayment.payment_status_id === 2) {
+        console.log('[payments/webhook] School payment already processed:', razorpayOrderId);
+        return NextResponse.json({ received: true, already_processed: true });
+      }
+
+      const planConfig = getPlanByTypeId(schoolPayment.plan_type_id);
+      if (!planConfig) {
+        return NextResponse.json({ error: 'Plan config not found' }, { status: 404 });
+      }
+
+      const { data: school } = await supabase
+        .from('schools')
+        .select('plan_expires_at')
+        .eq('id', schoolPayment.school_id)
+        .maybeSingle();
+
+      if (school) {
+        const newExpiry = calculateNewExpiry(school.plan_expires_at, planConfig.days);
+        // Update school
+        await supabase
+          .from('schools')
+          .update({
+            plan_type_id: planConfig.typeId,
+            plan_status_id: 1, // active
+            plan_started_at: now.toISOString(),
+            plan_expires_at: newExpiry,
+            plan_price: planConfig.price,
+            setup_fee: 0,
+            discount_percent: 0,
+            updated_at: now.toISOString(),
+          })
+          .eq('id', schoolPayment.school_id);
+
+        // Update payment
+        await supabase
+          .from('payments')
+          .update({
+            payment_status_id: 2, // success
+            gateway_payment_id: razorpayPaymentId,
+            paid_at: now.toISOString(),
+            notes: `Online upgrade to ${planConfig.name} plan completed via webhook fail-safe`,
+            updated_at: now.toISOString(),
+          })
+          .eq('id', schoolPayment.id);
+
+        console.log(`[payments/webhook] ✅ School payment processed via webhook | school=${schoolPayment.school_id} | order=${razorpayOrderId}`);
+        return NextResponse.json({ received: true, success: true });
+      }
+    }
+
     // Order not in our DB — log and ignore (could be test event)
     console.warn('[payments/webhook] Order not found in DB:', razorpayOrderId);
     return NextResponse.json({ received: true, skipped: true });
@@ -94,7 +159,6 @@ export async function POST(req: NextRequest) {
   }
 
   // ── 5. Process payment (same logic as /verify but webhook-triggered) ─────
-  const now = new Date();
   const expiresAt = new Date(now);
   expiresAt.setDate(expiresAt.getDate() + 30);
 

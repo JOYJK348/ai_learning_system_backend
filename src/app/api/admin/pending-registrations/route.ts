@@ -30,11 +30,17 @@ export async function GET(req: NextRequest) {
     const { data: parentRegs, error: parentError } = await query;
     if (parentError) return json({ error: parentError.message }, 500);
 
-    const { data: schoolRegs, error: schoolError } = await supabaseAdmin
+    let schoolQuery = supabaseAdmin
       .from("school_registrations")
       .select("id, school_name, admin_name, admin_email, admin_phone, address, city, board_name, status, rejection_reason, created_at")
       .is("deleted_at", null)
       .order("created_at", { ascending: false });
+
+    if (status) {
+      schoolQuery = schoolQuery.eq("status", status);
+    }
+
+    const { data: schoolRegs, error: schoolError } = await schoolQuery;
 
     if (schoolError) return json({ error: schoolError.message }, 500);
 

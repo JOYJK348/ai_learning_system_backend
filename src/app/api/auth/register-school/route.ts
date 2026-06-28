@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase-server";
 import { getClientIp, getUserAgent, json, logAuthAttempt } from "@/lib/auth-helpers";
+import { sendSchoolRegistrationReceivedEmail } from "@/lib/email";
 
 export async function POST(req: NextRequest) {
   const ip = getClientIp(req);
@@ -113,6 +114,13 @@ export async function POST(req: NextRequest) {
   if (error) return json({ error: error.message }, 400);
 
   await logAuthAttempt({ email: adminEmail, role: "school_admin", success: true, reason: "register_school_pending", ip, userAgent });
+
+  // Send "Registration Received" confirmation email in the background
+  sendSchoolRegistrationReceivedEmail({
+    adminEmail,
+    adminName,
+    schoolName,
+  }).catch(err => console.error("School registration received email error:", err));
 
   return json({ data: { id: data.id, status: data.status, message: "School onboarding request submitted for approval" } }, 201);
 }

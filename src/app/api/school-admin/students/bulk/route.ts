@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase-server";
-import { getCurrentUser, json, requireRole } from "@/lib/auth-helpers";
+import { json, requireSchoolAdmin } from "@/lib/auth-helpers";
 import { sendWelcomeEmail, sendChildLinkedEmail } from "@/lib/email";
 
 interface BulkStudentRow {
@@ -33,13 +33,14 @@ function getStudentPassword(phone: string | null): string {
   return String(Math.floor(100000 + Math.random() * 900000));
 }
 
-export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
-  const user = await getCurrentUser(req);
-  if (!requireRole(user, ["super_admin", "school_admin"])) return json({ error: "Forbidden" }, 403);
+export async function POST(req: NextRequest) {
+  const { user, planExpired } = await requireSchoolAdmin(req);
+  if (planExpired) return json({ error: "plan_expired", message: "Your 14-day trial has ended. Please contact support to renew your plan." }, 403);
+  if (!user) return json({ error: "Forbidden" }, 403);
 
   try {
     const supabase = getSupabaseAdmin();
-    const schoolId = params.id;
+    const schoolId = user.schoolId;
     const body = await req.json();
     const rows: BulkStudentRow[] = body.students;
 
@@ -202,7 +203,6 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 
       // 4. Handle Parent Account Creation / Linking
       let parentStatus: 'created' | 'linked' | 'none' = 'none';
-      let parentEmailSent = false;
       const cleanParentEmail = row.parent_email?.trim().toLowerCase();
 
       if (cleanParentEmail) {
@@ -236,7 +236,6 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
                 childEmail: childEmail,
                 childPass: childPass
               });
-              parentEmailSent = true;
             }
           } else {
             console.error("Failed linking to existing parent:", lnkParentErr.message);
@@ -246,6 +245,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
           const parentPass = getParentPassword(row.parent_phone || null);
           const sanitizedParentPhone = row.parent_phone ? String(row.parent_phone).replace(/[^0-9]/g, "") : null;
 
+          let parentAuthId = "";
           const { data: parentAuth, error: paErr } = await supabase.auth.admin.createUser({
             email: cleanParentEmail,
             password: parentPass,
@@ -253,9 +253,22 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
             user_metadata: { role: "parent", name: row.parent_name || "Parent" },
           });
 
-          if (!paErr && parentAuth?.user) {
+          if (paErr) {
+            // Find existing auth user in Supabase
+            const { data: usersData } = await supabase.auth.admin.listUsers();
+            const existingAuthUser = usersData?.users.find(u => u.email?.toLowerCase() === cleanParentEmail);
+            if (existingAuthUser) {
+              parentAuthId = existingAuthUser.id;
+            } else {
+              console.error("Parent Auth creation failed:", paErr.message);
+            }
+          } else if (parentAuth?.user) {
+            parentAuthId = parentAuth.user.id;
+          }
+
+          if (parentAuthId) {
             const { data: parentRec, error: ppErr } = await supabase.from("parents").insert({
-              auth_user_id: parentAuth.user.id,
+              auth_user_id: parentAuthId,
               email: cleanParentEmail,
               phone: sanitizedParentPhone,
               name: row.parent_name || "Parent",
@@ -289,11 +302,13 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
                   childEmail: childEmail,
                   childPass: childPass
                 });
-                parentEmailSent = true;
               }
             } else {
-              // clean up parent auth on failure
-              await supabase.auth.admin.deleteUser(parentAuth.user.id);
+              console.error("Failed creating parent record:", ppErr?.message);
+              // clean up parent auth on failure if created fresh
+              if (!paErr && parentAuth?.user) {
+                await supabase.auth.admin.deleteUser(parentAuth.user.id);
+              }
             }
           }
         }

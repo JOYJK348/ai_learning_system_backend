@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase-server";
 import { getClientIp, getUserAgent, json, logAuthAttempt } from "@/lib/auth-helpers";
 import { APIError, errorResponse } from "@/lib/api-error";
+import { sendParentRegistrationReceivedEmail } from "@/lib/email";
 
 export async function POST(req: NextRequest) {
   const ip = getClientIp(req);
@@ -121,6 +122,13 @@ export async function POST(req: NextRequest) {
     if (error) throw error;
 
     await logAuthAttempt({ email: parentEmail, role: "parent", success: true, reason: "register_pending", ip, userAgent });
+
+    // Send "Registration Received" confirmation email in the background
+    sendParentRegistrationReceivedEmail({
+      parentEmail,
+      parentName,
+      childName,
+    }).catch(err => console.error("Parent registration received email error:", err));
 
     return json({ data: { id: data.id, status: data.status, message: "Registration submitted for approval" } }, 201);
   } catch (error) {

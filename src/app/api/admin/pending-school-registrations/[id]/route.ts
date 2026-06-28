@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase-server";
 import { getCurrentUser, json, requireRole } from "@/lib/auth-helpers";
-import { sendSchoolWelcomeEmail } from "@/lib/email";
+import { sendSchoolWelcomeEmail, sendSchoolRejectionEmail } from "@/lib/email";
 
 function generateSchoolPassword(schoolName: string): string {
   const clean = schoolName.replace(/[^a-zA-Z]/g, "");
@@ -54,6 +54,15 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
         .eq("id", params.id);
 
       if (updateError) return json({ error: updateError.message }, 500);
+
+      // Send rejection email to school admin
+      sendSchoolRejectionEmail({
+        adminEmail: reg.admin_email,
+        adminName: reg.admin_name,
+        schoolName: reg.school_name,
+        reason: rejectionReason || undefined,
+      }).catch(err => console.error("School rejection email error:", err));
+
       return json({ data: { status: "rejected" } });
     }
 
@@ -73,6 +82,9 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       return json({ error: "Required lookup configuration missing" }, 500);
     }
 
+    // Sanitize phone number (remove +, spaces, dashes to pass database check constraint for digits only)
+    const sanitizedPhone = reg.admin_phone ? String(reg.admin_phone).replace(/[^0-9]/g, "") : null;
+
     // 1. Create school record
     const { data: schoolRec, error: schoolErr } = await supabaseAdmin
       .from("schools")
@@ -81,10 +93,10 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
         code: schoolCode,
         address: reg.address || null,
         city: reg.city || null,
-        phone: reg.admin_phone || null,
+        phone: sanitizedPhone,
         email: reg.admin_email,
         principal_name: reg.admin_name,
-        principal_phone: reg.admin_phone || null,
+        principal_phone: sanitizedPhone,
         plan_type_id: schoolPlanTypeId,
         plan_status_id: activePlanStatusId,
         plan_started_at: new Date().toISOString(),
@@ -120,7 +132,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
         email: reg.admin_email,
         name: reg.admin_name,
         role_id: schoolAdminRoleId,
-        phone: reg.admin_phone || null,
+        phone: sanitizedPhone,
         status_id: activeStatusId,
       });
 
@@ -158,7 +170,8 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
         status: "approved",
         school_code: schoolCode,
         admin_credentials: {
-          email: adminEmail,
+          email: reg.admin_email,
+          username: adminEmail,
           password: adminPass,
         }
       }
