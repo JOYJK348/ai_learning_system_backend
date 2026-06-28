@@ -80,6 +80,70 @@ export async function GET(req: NextRequest) {
 
       const quizLessonIds = new Set<string>((allQuizzes || []).map((q) => q.lesson_id));
 
+      // Get all student IDs associated with this school to fetch real quiz performance
+      const { data: schoolStudents } = await supabase
+        .from("school_students")
+        .select("student_id")
+        .eq("school_id", user.schoolId)
+        .is("deleted_at", null);
+
+      const studentIds = schoolStudents?.map(s => s.student_id) || [];
+
+      // Fetch all quiz attempts for these students
+      const { data: quizAttempts } = studentIds.length > 0
+        ? await supabase
+            .from("quiz_attempts")
+            .select("student_id, quiz_id, percentage")
+            .in("student_id", studentIds)
+            .is("deleted_at", null)
+        : { data: [] };
+
+      // Map quiz_id to subject/grade to associate attempt percentages with grades
+      const quizToGradeMap = new Map<string, string>(); // quiz_id -> grade_id
+      const lessonToGradeMap = new Map<string, string>(); // lesson_id -> grade_id
+
+      const { data: quizzesWithLessons } = await supabase
+        .from("quizzes")
+        .select("id, lesson_id")
+        .is("deleted_at", null);
+
+      const quizLessonMap = new Map<string, string>();
+      (quizzesWithLessons || []).forEach(q => quizLessonMap.set(q.id, q.lesson_id));
+
+      // Map lessons to grades
+      for (const [gradeId, gradeSubjects] of subjectsByGrade.entries()) {
+        for (const sub of gradeSubjects) {
+          const subChapters = chaptersBySubject.get(sub.id) || [];
+          for (const ch of subChapters) {
+            const chLessons = lessonsByChapter.get(ch.id) || [];
+            for (const l of chLessons) {
+              lessonToGradeMap.set(l.id, gradeId);
+            }
+          }
+        }
+      }
+
+      // Map quizzes to grades
+      for (const q of quizzesWithLessons || []) {
+        const gradeId = lessonToGradeMap.get(q.lesson_id);
+        if (gradeId) {
+          quizToGradeMap.set(q.id, gradeId);
+        }
+      }
+
+      // Group attempt percentages by grade
+      const attemptsByGrade = new Map<string, number[]>();
+      let allAttemptPercentages: number[] = [];
+
+      (quizAttempts || []).forEach((att) => {
+        const gradeId = quizToGradeMap.get(att.quiz_id);
+        if (gradeId) {
+          if (!attemptsByGrade.has(gradeId)) attemptsByGrade.set(gradeId, []);
+          attemptsByGrade.get(gradeId)!.push(att.percentage || 0);
+          allAttemptPercentages.push(att.percentage || 0);
+        }
+      });
+
       let totalSubjects = 0;
       let totalLessons = 0;
       let totalQuizzes = 0;
@@ -104,15 +168,26 @@ export async function GET(req: NextRequest) {
         totalLessons += lessonsInGrade;
         totalQuizzes += quizzesInGrade;
 
+        // Calculate dynamic Fun Score (average of student quiz attempts in this grade)
+        const gradePercentages = attemptsByGrade.get(g.id) || [];
+        const funScore = gradePercentages.length > 0
+          ? Math.round(gradePercentages.reduce((a, b) => a + b, 0) / gradePercentages.length)
+          : 0;
+
         return {
           id: g.id,
           name: g.name,
           subjects_count: subjectCount,
           lessons_count: lessonsInGrade,
           quizzes_count: quizzesInGrade,
-          fun_score: lessonsInGrade > 0 ? Math.round((quizzesInGrade / lessonsInGrade) * 100) : 0,
+          fun_score: funScore,
         };
       });
+
+      // Overall average Fun Score based on all student attempts in the school
+      const avgFunScore = allAttemptPercentages.length > 0
+        ? Math.round(allAttemptPercentages.reduce((a, b) => a + b, 0) / allAttemptPercentages.length)
+        : 0;
 
       return json({
         data: {
@@ -121,7 +196,7 @@ export async function GET(req: NextRequest) {
             total_subjects: totalSubjects,
             total_lessons: totalLessons,
             total_quizzes: totalQuizzes,
-            avg_fun_score: totalLessons > 0 ? Math.round((totalQuizzes / totalLessons) * 100) : 0,
+            avg_fun_score: avgFunScore,
           },
         },
       });

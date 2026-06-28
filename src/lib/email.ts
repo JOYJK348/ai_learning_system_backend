@@ -12,7 +12,6 @@ const FROM_ALERTS = "ZHI LearnAI <alerts@joyautomations.in>";
 const FOOTER_LINE = "ZHI LearnAI Singapore · © 2026. All rights reserved.";
 const DISCLAIMER = "This is a system-generated notification. Please do not reply directly to this message.";
 
-// ─── Shared HTML Shell ────────────────────────────────────────────────────────
 function buildEmail(title: string, bodyContent: string): string {
   return `<!DOCTYPE html>
 <html lang="en">
@@ -21,57 +20,88 @@ function buildEmail(title: string, bodyContent: string): string {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>${title}</title>
     <style>
-      body { margin:0; padding:0; background:#f5f5f5; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif; color:#1e293b; -webkit-font-smoothing:antialiased; }
-      table { border-collapse:collapse; }
-      .wrap { max-width:600px; margin:40px auto; }
-      .card { background:#ffffff; border:1px solid #e2e8f0; border-radius:3px; overflow:hidden; }
-      .header { padding:36px 44px 28px; border-bottom:1px solid #f1f5f9; }
-      .logo { font-size:17px; font-weight:800; letter-spacing:2.5px; text-transform:uppercase; color:#12312f; margin:0; }
-      .logo span { color:#16a085; }
-      .body { padding:44px; }
-      h1.title { font-size:21px; font-weight:600; color:#0f172a; margin:0 0 14px; letter-spacing:-0.02em; }
-      p.intro { font-size:14.5px; line-height:1.7; color:#475569; margin:0 0 36px; }
-      .divider { height:1px; background:#f1f5f9; margin:36px 0; }
-      .label-block { margin-bottom:18px; }
-      .lbl { font-size:10.5px; color:#94a3b8; text-transform:uppercase; letter-spacing:0.6px; margin-bottom:3px; }
-      .val { font-size:13.5px; font-weight:600; color:#0f172a; font-family:'SFMono-Regular',Consolas,'Liberation Mono',Menlo,monospace; }
-      .section-head { font-size:10.5px; font-weight:700; text-transform:uppercase; letter-spacing:1px; color:#64748b; margin:0 0 20px; }
-      .step { margin-bottom:18px; }
-      .step-num { font-size:10.5px; font-weight:700; color:#16a085; margin-bottom:3px; letter-spacing:0.5px; }
-      .step-text { font-size:13.5px; line-height:1.55; color:#475569; }
-      .step-text strong { color:#0f172a; }
-      .btn { display:inline-block; background:#12312f; color:#ffffff !important; text-decoration:none; font-weight:700; font-size:11.5px; text-transform:uppercase; letter-spacing:1px; padding:13px 28px; border-radius:3px; margin-top:36px; }
-      .alert-box { border-left:3px solid #dc2626; background:#fef2f2; padding:16px 20px; border-radius:0 3px 3px 0; margin:24px 0; }
-      .alert-box p { margin:0; font-size:13.5px; line-height:1.6; color:#7f1d1d; }
-      .info-box { border-left:3px solid #16a085; background:#f0fdf4; padding:16px 20px; border-radius:0 3px 3px 0; margin:24px 0; }
-      .info-box p { margin:0; font-size:13.5px; line-height:1.6; color:#14532d; }
-      .creds-table { width:100%; border:1px solid #e2e8f0; border-radius:3px; overflow:hidden; margin:24px 0; }
-      .creds-table td { padding:14px 18px; border-bottom:1px solid #f1f5f9; vertical-align:top; }
-      .creds-table td:last-child { border-bottom:none; }
-      .creds-table .td-lbl { width:38%; }
-      .metric-row { display:flex; gap:0; margin:20px 0; }
-      .metric { flex:1; text-align:center; padding:16px 10px; border-right:1px solid #f1f5f9; }
-      .metric:last-child { border-right:none; }
-      .metric-num { font-size:22px; font-weight:700; color:#12312f; display:block; }
-      .metric-lbl { font-size:10.5px; color:#94a3b8; text-transform:uppercase; letter-spacing:0.5px; margin-top:4px; display:block; }
-      .footer { background:#fafafa; border-top:1px solid #f1f5f9; padding:24px 44px; }
-      .footer p { font-size:11px; color:#94a3b8; line-height:1.6; margin:0; }
+      body { margin:0; padding:0; background-color:#f5f5f5; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif; color:#1e293b; -webkit-font-smoothing:antialiased; width:100% !important; -webkit-text-size-adjust:100%; -ms-text-size-adjust:100%; }
+      table, td { mso-table-lspace:0pt; mso-table-rspace:0pt; border-collapse:collapse; }
+      img { border:0; height:auto; line-height:100%; outline:none; text-decoration:none; }
+      p { display:block; margin:13px 0; }
+      @media only screen and (max-width: 480px) {
+        .container-table { width:100% !important; }
+        .body-cell { padding:24px 16px !important; }
+        .header-cell { padding:28px 16px 20px !important; }
+        .footer-cell { padding:20px 16px !important; }
+        .creds-table { display:block !important; width:100% !important; }
+        .creds-table tr { display:block !important; width:100% !important; margin-bottom:10px; }
+        .creds-table td { display:block !important; width:100% !important; box-sizing:border-box !important; padding:10px 12px !important; border:none !important; border-bottom:1px solid #f1f5f9 !important; }
+        .creds-table td:last-child { border-bottom:none !important; }
+        .creds-table .td-lbl { width:100% !important; background-color:#fafafa !important; border-right:none !important; }
+      }
     </style>
   </head>
-  <body>
-    <div class="wrap">
-      <div class="card">
-        <div class="header">
-          <div class="logo">ZHI <span>LearnAI</span></div>
-        </div>
-        <div class="body">
-          ${bodyContent}
-        </div>
-        <div class="footer">
-          <p>${DISCLAIMER}<br>${FOOTER_LINE}</p>
-        </div>
-      </div>
-    </div>
+  <body style="margin:0; padding:0; background-color:#f5f5f5;">
+    <center>
+      <table align="center" border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color:#f5f5f5; width:100%; table-layout:fixed;">
+        <tr>
+          <td align="center" style="padding:20px 10px;">
+            <!--[if mso]>
+            <table align="center" border="0" cellspacing="0" cellpadding="0" width="600">
+            <tr>
+            <td align="center" valign="top" width="600">
+            <![endif]-->
+            <table class="container-table" border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width:600px; background-color:#ffffff; border:1px solid #e2e8f0; border-radius:3px; overflow:hidden;">
+              <!-- Header -->
+              <tr>
+                <td class="header-cell" align="left" style="padding:36px 44px 28px; border-bottom:1px solid #f1f5f9;">
+                  <div style="font-size:17px; font-weight:800; letter-spacing:2.5px; text-transform:uppercase; color:#12312f; margin:0;">
+                    ZHI <span style="color:#16a085;">LearnAI</span>
+                  </div>
+                </td>
+              </tr>
+              <!-- Body Content -->
+              <tr>
+                <td class="body-cell" align="left" style="padding:44px; font-size:14.5px; line-height:1.7; color:#475569;">
+                  <style>
+                    h1.title { font-size:21px; font-weight:600; color:#0f172a; margin:0 0 14px; letter-spacing:-0.02em; }
+                    p.intro { font-size:14.5px; line-height:1.7; color:#475569; margin:0 0 36px; }
+                    .divider { height:1px; background:#f1f5f9; margin:36px 0; }
+                    .lbl { font-size:10.5px; color:#94a3b8; text-transform:uppercase; letter-spacing:0.6px; margin-bottom:3px; }
+                    .val { font-size:13px; font-weight:600; color:#0f172a; font-family:'SFMono-Regular',Consolas,monospace; word-break:break-all; white-space:pre-wrap; word-wrap:break-word; }
+                    .section-head { font-size:10.5px; font-weight:700; text-transform:uppercase; letter-spacing:1px; color:#64748b; margin:0 0 20px; }
+                    .step { margin-bottom:18px; }
+                    .step-num { font-size:10.5px; font-weight:700; color:#16a085; margin-bottom:3px; letter-spacing:0.5px; }
+                    .step-text { font-size:13.5px; line-height:1.55; color:#475569; }
+                    .step-text strong { color:#0f172a; }
+                    .btn { display:inline-block; background-color:#12312f; color:#ffffff !important; text-decoration:none; font-weight:700; font-size:11.5px; text-transform:uppercase; letter-spacing:1px; padding:13px 28px; border-radius:3px; margin-top:20px; }
+                    .alert-box { border-left:3px solid #dc2626; background-color:#fef2f2; padding:16px 20px; border-radius:0 3px 3px 0; margin:24px 0; }
+                    .alert-box p { margin:0; font-size:13.5px; line-height:1.6; color:#7f1d1d; }
+                    .info-box { border-left:3px solid #16a085; background-color:#f0fdf4; padding:16px 20px; border-radius:0 3px 3px 0; margin:24px 0; }
+                    .info-box p { margin:0; font-size:13.5px; line-height:1.6; color:#14532d; }
+                    .creds-table { width:100%; border:1px solid #e2e8f0; border-radius:3px; overflow:hidden; margin:24px 0; table-layout:fixed; }
+                    .creds-table td { padding:14px 18px; border-bottom:1px solid #f1f5f9; vertical-align:top; word-break:break-all; word-wrap:break-word; }
+                    .creds-table td:last-child { border-bottom:none; }
+                    .creds-table .td-lbl { width:35%; background-color:#fafafa; border-right:1px solid #f1f5f9; }
+                  </style>
+                  ${bodyContent}
+                </td>
+              </tr>
+              <!-- Footer -->
+              <tr>
+                <td class="footer-cell" align="left" style="background-color:#fafafa; border-top:1px solid #f1f5f9; padding:24px 44px;">
+                  <p style="font-size:11px; color:#94a3b8; line-height:1.6; margin:0;">
+                    ${DISCLAIMER}<br>
+                    ${FOOTER_LINE}
+                  </p>
+                </td>
+              </tr>
+            </table>
+            <!--[if mso]>
+            </td>
+            </tr>
+            </table>
+            <![endif]-->
+          </td>
+        </tr>
+      </table>
+    </center>
   </body>
 </html>`;
 }
@@ -128,11 +158,11 @@ export async function sendWelcomeEmail(params: {
   childPass: string;
 }) {
   const body = `
-    <h1 class="title">Welcome to ZHI LearnAI</h1>
+    <h1 class="title">Your ZHI LearnAI Account</h1>
     <p class="intro">
       Dear ${params.parentName},<br><br>
-      We are pleased to inform you that your registration request has been verified. 
-      Your personal portal environment is ready. Below are the access keys assigned to your household.
+      Thank you for completing your registration request. 
+      Your personal dashboard profile has been successfully verified. Please find your access details below:
     </p>
 
     <div class="section-head">Guardian Profile Access</div>
@@ -148,25 +178,25 @@ export async function sendWelcomeEmail(params: {
     </table>
 
     <div class="divider"></div>
-    <div class="section-head">How to Start</div>
+    <div class="section-head">Getting Started</div>
 
     <div class="step"><div class="step-num">STEP 1</div>
-      <div class="step-text">Open the portal and sign in with your <strong>Guardian Profile</strong> credentials.</div>
+      <div class="step-text">Open the portal and log in with your Guardian Profile details.</div>
     </div>
     <div class="step"><div class="step-num">STEP 2</div>
-      <div class="step-text">Configure course settings and check initial child developmental stages.</div>
+      <div class="step-text">Verify course preferences and developmental child milestones.</div>
     </div>
     <div class="step"><div class="step-num">STEP 3</div>
-      <div class="step-text">Use the <strong>Student Workspace</strong> ID to log your child in and begin lessons.</div>
+      <div class="step-text">Have your child log in using the Student Workspace ID.</div>
     </div>
 
-    <a href="${PORTAL_URL}/login" class="btn">Access Portal</a>
+    <a href="${PORTAL_URL}/login" class="btn">Launch Portal</a>
   `;
   return dispatch({
     from: FROM_ONBOARDING,
     to: params.parentEmail,
-    subject: "ZHI LearnAI — Account Confirmed",
-    html: buildEmail("ZHI LearnAI — Account Access details", body),
+    subject: "ZHI LearnAI Onboarding Verification",
+    html: buildEmail("ZHI LearnAI Account Setup Details", body),
     label: "parent-welcome",
   });
 }
@@ -183,11 +213,11 @@ export async function sendSchoolWelcomeEmail(params: {
   schoolCode: string;
 }) {
   const body = `
-    <h1 class="title">School Portal Ready</h1>
+    <h1 class="title">ZHI LearnAI School Setup</h1>
     <p class="intro">
       Dear ${params.adminName},<br><br>
-      The verification request for <strong>${params.schoolName}</strong> is complete. 
-      Your institution's control dashboard is configured. Use the keys below to sign in.
+      The onboarding profile configuration for <strong>${params.schoolName}</strong> is complete. 
+      Your administrator account access is active. Setup details are listed below:
     </p>
 
     <div class="section-head">Administrator Access Keys</div>
@@ -201,13 +231,13 @@ export async function sendSchoolWelcomeEmail(params: {
     <div class="section-head">Dashboard Setup Steps</div>
 
     <div class="step"><div class="step-num">STEP 1</div>
-      <div class="step-text">Navigate to the portal and enter the <strong>System ID</strong> and <strong>Security Key</strong> listed above.</div>
+      <div class="step-text">Log in to the dashboard using your System ID and Security Key.</div>
     </div>
     <div class="step"><div class="step-num">STEP 2</div>
-      <div class="step-text">From the dashboard, configure classroom lists and assign teachers.</div>
+      <div class="step-text">Set up classroom lists and assign teachers.</div>
     </div>
     <div class="step"><div class="step-num">STEP 3</div>
-      <div class="step-text">Enrol students manually or via bulk upload to generate student logins.</div>
+      <div class="step-text">Enrol students manually or via bulk upload.</div>
     </div>
 
     <a href="${PORTAL_URL}/login" class="btn">Launch Dashboard</a>
@@ -215,8 +245,8 @@ export async function sendSchoolWelcomeEmail(params: {
   return dispatch({
     from: FROM_ONBOARDING,
     to: params.adminEmail,
-    subject: "ZHI LearnAI — School Dashboard Ready",
-    html: buildEmail("ZHI LearnAI — Portal Setup details", body),
+    subject: "ZHI LearnAI School Onboarding Verification",
+    html: buildEmail("ZHI LearnAI School Setup Details", body),
     label: "school-welcome",
   });
 }
