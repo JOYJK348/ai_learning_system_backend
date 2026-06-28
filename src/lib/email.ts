@@ -128,45 +128,45 @@ export async function sendWelcomeEmail(params: {
   childPass: string;
 }) {
   const body = `
-    <h1 class="title">Account Activation</h1>
+    <h1 class="title">Welcome to ZHI LearnAI</h1>
     <p class="intro">
       Dear ${params.parentName},<br><br>
-      We are pleased to inform you that your onboarding request has been reviewed and approved.
-      The access credentials for your household have been generated and are listed below.
+      We are pleased to inform you that your registration request has been verified. 
+      Your personal portal environment is ready. Below are the access keys assigned to your household.
     </p>
 
-    <div class="section-head">Parent Control Panel</div>
+    <div class="section-head">Guardian Profile Access</div>
     <table class="creds-table">
-      <tr><td class="td-lbl"><div class="lbl">Username</div></td><td><div class="val">${params.parentEmail}</div></td></tr>
-      <tr><td class="td-lbl"><div class="lbl">Temporary Password</div></td><td><div class="val">${params.parentPass}</div></td></tr>
+      <tr><td class="td-lbl"><div class="lbl">Account ID</div></td><td><div class="val">${params.parentEmail}</div></td></tr>
+      <tr><td class="td-lbl"><div class="lbl">Security Key</div></td><td><div class="val">${params.parentPass}</div></td></tr>
     </table>
 
-    <div class="section-head" style="margin-top:28px;">Student Learning Space — ${params.childName}</div>
+    <div class="section-head" style="margin-top:28px;">Student Workspace — ${params.childName}</div>
     <table class="creds-table">
-      <tr><td class="td-lbl"><div class="lbl">Student ID</div></td><td><div class="val">${params.childEmail}</div></td></tr>
-      <tr><td class="td-lbl"><div class="lbl">Temporary Password</div></td><td><div class="val">${params.childPass}</div></td></tr>
+      <tr><td class="td-lbl"><div class="lbl">Access ID</div></td><td><div class="val">${params.childEmail}</div></td></tr>
+      <tr><td class="td-lbl"><div class="lbl">Security Key</div></td><td><div class="val">${params.childPass}</div></td></tr>
     </table>
 
     <div class="divider"></div>
-    <div class="section-head">Activation Steps</div>
+    <div class="section-head">How to Start</div>
 
-    <div class="step"><div class="step-num">01 / PORTAL ACCESS</div>
-      <div class="step-text">Navigate to the portal and sign in using your <strong>Parent Control Panel</strong> credentials to review your account settings.</div>
+    <div class="step"><div class="step-num">STEP 1</div>
+      <div class="step-text">Open the portal and sign in with your <strong>Guardian Profile</strong> credentials.</div>
     </div>
-    <div class="step"><div class="step-num">02 / COURSE SETTINGS</div>
-      <div class="step-text">Configure course preferences and review initial assessments from the parent dashboard.</div>
+    <div class="step"><div class="step-num">STEP 2</div>
+      <div class="step-text">Configure course settings and check initial child developmental stages.</div>
     </div>
-    <div class="step"><div class="step-num">03 / STUDENT LOGIN</div>
-      <div class="step-text">Have your child sign in using the <strong>Student ID</strong> to begin their personalised learning journey.</div>
+    <div class="step"><div class="step-num">STEP 3</div>
+      <div class="step-text">Use the <strong>Student Workspace</strong> ID to log your child in and begin lessons.</div>
     </div>
 
-    <a href="${PORTAL_URL}/login" class="btn">Launch Parent Portal</a>
+    <a href="${PORTAL_URL}/login" class="btn">Access Portal</a>
   `;
   return dispatch({
     from: FROM_ONBOARDING,
     to: params.parentEmail,
-    subject: "ZHI LearnAI — Account Activation Confirmed",
-    html: buildEmail("ZHI LearnAI — Account Activation", body),
+    subject: "ZHI LearnAI — Account Confirmed",
+    html: buildEmail("ZHI LearnAI — Account Access details", body),
     label: "parent-welcome",
   });
 }
@@ -183,40 +183,40 @@ export async function sendSchoolWelcomeEmail(params: {
   schoolCode: string;
 }) {
   const body = `
-    <h1 class="title">School Portal Activation</h1>
+    <h1 class="title">School Portal Ready</h1>
     <p class="intro">
       Dear ${params.adminName},<br><br>
-      We are pleased to inform you that the onboarding request for <strong>${params.schoolName}</strong> has been reviewed and approved.
-      Your institution's portal has been configured and your administrator credentials are provided below.
+      The verification request for <strong>${params.schoolName}</strong> is complete. 
+      Your institution's control dashboard is configured. Use the keys below to sign in.
     </p>
 
-    <div class="section-head">School Administrator Credentials</div>
+    <div class="section-head">Administrator Access Keys</div>
     <table class="creds-table">
-      <tr><td class="td-lbl"><div class="lbl">School Code</div></td><td><div class="val">${params.schoolCode}</div></td></tr>
-      <tr><td class="td-lbl"><div class="lbl">System Username</div></td><td><div class="val">${params.adminUsername}</div></td></tr>
-      <tr><td class="td-lbl"><div class="lbl">Temporary Password</div></td><td><div class="val">${params.adminPass}</div></td></tr>
+      <tr><td class="td-lbl"><div class="lbl">Registry Code</div></td><td><div class="val">${params.schoolCode}</div></td></tr>
+      <tr><td class="td-lbl"><div class="lbl">System ID</div></td><td><div class="val">${params.adminUsername}</div></td></tr>
+      <tr><td class="td-lbl"><div class="lbl">Security Key</div></td><td><div class="val">${params.adminPass}</div></td></tr>
     </table>
 
     <div class="divider"></div>
-    <div class="section-head">Onboarding Steps</div>
+    <div class="section-head">Dashboard Setup Steps</div>
 
-    <div class="step"><div class="step-num">01 / PORTAL LOGIN</div>
-      <div class="step-text">Navigate to the administrator portal and sign in using your <strong>System Username</strong> and <strong>Temporary Password</strong> above.</div>
+    <div class="step"><div class="step-num">STEP 1</div>
+      <div class="step-text">Navigate to the portal and enter the <strong>System ID</strong> and <strong>Security Key</strong> listed above.</div>
     </div>
-    <div class="step"><div class="step-num">02 / CONFIGURE CLASSROOMS</div>
-      <div class="step-text">From your school admin dashboard, configure classroom sections, grades, and assign teachers to each class.</div>
+    <div class="step"><div class="step-num">STEP 2</div>
+      <div class="step-text">From the dashboard, configure classroom lists and assign teachers.</div>
     </div>
-    <div class="step"><div class="step-num">03 / DISTRIBUTE STUDENT IDs</div>
-      <div class="step-text">Use the bulk upload or manual enrol feature to register students. Use the export function to share individual student login credentials.</div>
+    <div class="step"><div class="step-num">STEP 3</div>
+      <div class="step-text">Enrol students manually or via bulk upload to generate student logins.</div>
     </div>
 
-    <a href="${PORTAL_URL}/login" class="btn">Launch School Dashboard</a>
+    <a href="${PORTAL_URL}/login" class="btn">Launch Dashboard</a>
   `;
   return dispatch({
     from: FROM_ONBOARDING,
     to: params.adminEmail,
-    subject: "ZHI LearnAI — School Portal Activation Confirmed",
-    html: buildEmail("ZHI LearnAI — School Portal Activation", body),
+    subject: "ZHI LearnAI — School Dashboard Ready",
+    html: buildEmail("ZHI LearnAI — Portal Setup details", body),
     label: "school-welcome",
   });
 }
