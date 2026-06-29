@@ -1145,30 +1145,100 @@ export async function submitQuizScore(req: NextRequest, quizId: string) {
     const percentage = maxScore > 0 ? Math.round((score / maxScore) * 100) : 0;
     const passed = percentage >= 60;
 
-    // Verify quiz exists
-    const { data: quiz, error: quizError } = await supabaseAdmin
-      .from("quizzes")
-      .select("id,lesson_id")
-      .eq("id", quizId)
-      .is("deleted_at", null)
-      .maybeSingle();
+    // QUERY 1: Parallel validation (Quiz details + student profile + existing attempts)
+    const [quizResult, prevAttemptsResult, studentResult] = await Promise.all([
+      supabaseAdmin
+        .from("quizzes")
+        .select("id,lesson_id")
+        .eq("id", quizId)
+        .is("deleted_at", null)
+        .maybeSingle(),
+      supabaseAdmin
+        .from("quiz_attempts")
+        .select("attempt_number")
+        .eq("student_id", studentId)
+        .eq("quiz_id", quizId)
+        .is("deleted_at", null)
+        .order("attempt_number", { ascending: false })
+        .limit(1),
+      supabaseAdmin
+        .from("students")
+        .select("total_quizzes_attempted,total_quizzes_passed")
+        .eq("id", studentId)
+        .single()
+    ]);
 
-    if (quizError) return json({ error: quizError.message }, 500);
+    if (quizResult.error) return json({ error: quizResult.error.message }, 500);
+    const quiz = quizResult.data;
     if (!quiz) return json({ error: "Quiz not found" }, 404);
 
-    // Get next attempt number
-    const { data: prevAttempts } = await supabaseAdmin
-      .from("quiz_attempts")
-      .select("attempt_number")
-      .eq("student_id", studentId)
-      .eq("quiz_id", quizId)
-      .is("deleted_at", null)
-      .order("attempt_number", { ascending: false })
-      .limit(1);
+    const prevAttempts = prevAttemptsResult.data;
+    const studentRow = studentResult.data;
 
     const attemptNumber = (prevAttempts?.[0]?.attempt_number || 0) + 1;
     const now = new Date().toISOString();
 
+    // QUERY 2: Atomic lock update on lesson_progress to prevent double submit
+    const { data: progressUpdate, error: progressError } = await supabaseAdmin
+      .from("lesson_progress")
+      .update({
+        quiz_completed: true,
+        quiz_score: score,
+        quiz_max_score: maxScore,
+        status: "completed",
+        completed_at: now,
+        updated_at: now
+      })
+      .eq("student_id", studentId)
+      .eq("lesson_id", quiz.lesson_id)
+      .eq("quiz_completed", false) // Atomic Check
+      .select("id");
+
+    if (progressError) return json({ error: progressError.message }, 400);
+
+    // If no row was updated, it could be a retake (already completed). Let's handle it gracefully.
+    if (!progressUpdate || progressUpdate.length === 0) {
+      const { data: existingProgress } = await supabaseAdmin
+        .from("lesson_progress")
+        .select("quiz_score")
+        .eq("student_id", studentId)
+        .eq("lesson_id", quiz.lesson_id)
+        .maybeSingle();
+
+      if (existingProgress) {
+        // It's a retake! If new score is higher, update it.
+        const prevScore = Number(existingProgress.quiz_score ?? 0);
+        if (score > prevScore) {
+          await supabaseAdmin
+            .from("lesson_progress")
+            .update({
+              quiz_score: score,
+              quiz_max_score: maxScore,
+              updated_at: now
+            })
+            .eq("student_id", studentId)
+            .eq("lesson_id", quiz.lesson_id);
+        }
+      } else {
+        // No progress row exists at all? Create one!
+        await supabaseAdmin
+          .from("lesson_progress")
+          .insert({
+            student_id: studentId,
+            lesson_id: quiz.lesson_id,
+            status: "completed",
+            quiz_completed: true,
+            quiz_score: score,
+            quiz_max_score: maxScore,
+            completion_percentage: 100,
+            completed_at: now,
+            created_at: now,
+            updated_at: now
+          });
+      }
+    }
+
+    // Insert the attempt log entry
     const { data, error } = await supabaseAdmin
       .from("quiz_attempts")
       .insert({
@@ -1189,13 +1259,7 @@ export async function submitQuizScore(req: NextRequest, quizId: string) {
 
     if (error) return json({ error: error.message }, 400);
 
-    // Update student stats
-    const { data: studentRow } = await supabaseAdmin
-      .from("students")
-      .select("total_quizzes_attempted,total_quizzes_passed")
-      .eq("id", studentId)
-      .single();
-
+    // Update student stats if profile exists
     if (studentRow) {
       await supabaseAdmin
         .from("students")
