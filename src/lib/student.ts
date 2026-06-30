@@ -346,6 +346,11 @@ export async function listStudentLessons(req: NextRequest) {
     const lessonCountPerChapter: Record<string, number> = {};
     const completedLessonCountPerChapter: Record<string, number> = {};
     lessons.forEach((l) => {
+      // Ignore lessons that are filtered out on the frontend UI
+      const titleLower = l.title.toLowerCase();
+      if (titleLower.includes('inside') || titleLower.includes('outside') || titleLower.includes('complete the pattern') || (titleLower.includes('animal') && titleLower.includes('sound'))) {
+        return;
+      }
       lessonCountPerChapter[l.chapter_id] = (lessonCountPerChapter[l.chapter_id] || 0) + 1;
       const p = progressMap[l.id];
       if (p && p.status === "completed") {
@@ -968,10 +973,17 @@ export async function checkAndAutoUnlockNextChapter(studentId: string, lessonId:
     if (!chapter) return;
     const { data: chapterLessons } = await supabaseAdmin
       .from("lessons")
-      .select("id")
+      .select("id,title")
       .eq("chapter_id", lesson.chapter_id)
       .is("deleted_at", null);
-    const chapterLessonIds = (chapterLessons || []).map((l: { id: string }) => l.id);
+    
+    // Ignore lessons that are filtered out on the frontend UI
+    const visibleLessons = (chapterLessons || []).filter((l) => {
+      const titleLower = (l.title || '').toLowerCase();
+      return !(titleLower.includes('inside') || titleLower.includes('outside') || titleLower.includes('complete the pattern') || (titleLower.includes('animal') && titleLower.includes('sound')));
+    });
+
+    const chapterLessonIds = visibleLessons.map((l) => l.id);
     if (chapterLessonIds.length === 0) return;
     const { data: completedRows } = await supabaseAdmin
       .from("lesson_progress")
