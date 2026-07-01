@@ -1,0 +1,11 @@
+const { createClient } = require('@supabase/supabase-js');
+const supabase = createClient('https://nrwbwmhrbjmexxnejpbg.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5yd2J3bWhyYmptZXh4bmVqcGJnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MDQxMzk3MCwiZXhwIjoyMDk1OTg5OTcwfQ.5WWtNPhJAfBjNpP_gUFOqAl1Z6S34NzSDMY3C-z2QV0');
+
+(async () => {
+  const { data, error } = await supabase.from('lookup_activity_types').select('*');
+  if (error) {
+    console.error('Error fetching lookup_activity_types:', error);
+    return;
+  }
+  console.log(JSON.stringify(data, null, 2));
+})();
