@@ -10,7 +10,7 @@ export async function GET(req: NextRequest) {
   const { data, error } = await supabase.auth.refreshSession({ refresh_token: refreshToken });
   if (error || !data.session) return json({ error: "Session refresh failed" }, 401);
 
-  const res = json({ ok: true });
+  const res = json({ ok: true, access_token: data.session.access_token });
   setAuthCookies(res, data.session.access_token, data.session.refresh_token);
   return res;
 }

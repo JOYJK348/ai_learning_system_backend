@@ -72,7 +72,7 @@ export function setAuthCookies(res: NextResponse, accessToken: string, refreshTo
     secure,
     sameSite: secure ? "none" : "lax",
     path: "/",
-    maxAge: 60 * 60
+    maxAge: 60 * 60 * 24 * 7 // 7 days
   });
 
   if (refreshToken) {
